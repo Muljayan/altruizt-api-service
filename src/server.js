@@ -5,8 +5,9 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
-const authRoutes = require('./routes/auth');
-const autocompleteRoutes = require('./routes/autocomplete');
+const authRoutes = require('./controllers/auth');
+const autocompleteRoutes = require('./controllers/autocomplete');
+const selectorsRoutes = require('./controllers/selectors');
 
 // Read env variables
 
@@ -23,6 +24,7 @@ app.get('/', (req, res) => res.status(200).send({ works: true }));
 // Route Setup
 app.use('/auth', authRoutes);
 app.use('/autocomplete', autocompleteRoutes);
+app.use('/selectors', selectorsRoutes);
 
 app.listen(PORT, () => {
   console.log(`App is running on http://localhost:${PORT}`);
