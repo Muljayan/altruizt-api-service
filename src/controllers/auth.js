@@ -5,6 +5,7 @@ const router = express.Router();
 
 const DB = require('../config/database');
 const { JWT_SECRET } = require('../config/secrets');
+const convertToSlug = require('../utils/convertToSlug');
 
 router.post('/register', async (req, res) => {
   // Create transaction object
@@ -72,7 +73,6 @@ router.post('/register', async (req, res) => {
 
     // categoriesFollowed
     if (categoriesFollowed && categoriesFollowed.length > 0) {
-      // eslint-disable-next-line no-restricted-syntax
       for await (const categoryFollowed of categoriesFollowed) {
         await trx('categories_followed')
           .insert({ user_id: userId, category_id: categoryFollowed.value });
@@ -86,6 +86,7 @@ router.post('/register', async (req, res) => {
         is_activated: false,
         address,
         website,
+        slug: convertToSlug(`${name}-${userId}`),
         identification_number: identificationNumber,
       };
 
@@ -95,7 +96,6 @@ router.post('/register', async (req, res) => {
       // Add resources to list
       // Check if resources available and is an organization
       if (resources && resources.length > 0) {
-        // eslint-disable-next-line no-restricted-syntax
         for await (const resource of resources) {
           const resourceName = resource.name.toString().trim().toLowerCase();
           const resourceUnit = resource.unit.toString().trim().toLowerCase();
@@ -131,7 +131,6 @@ router.post('/register', async (req, res) => {
 
       // organization categories
       if (categories && categories.length > 0) {
-        // eslint-disable-next-line no-restricted-syntax
         for await (const category of categories) {
           await trx('organization_categories')
             .insert({ organization_id: organizationId, category_id: category.value });
@@ -161,6 +160,7 @@ router.post('/login', async (req, res) => {
       .where('email', email)
       .where('password', password)
       .first();
+
     if (!user) {
       return res.status(401).send({ message: 'your email or password is incorrect' });
     }
