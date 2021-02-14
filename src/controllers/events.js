@@ -348,4 +348,93 @@ router.get('/suggestions', async (req, res) => {
   }
 });
 
+router.post('/followings', async (req, res) => {
+  const tokenData = extractToken(req);
+  const { searchString, resources } = req.body;
+  const { user } = tokenData;
+  try {
+    const searchedResources = resources.map((resource) => resource.value);
+
+    const eventQuery = DB('events as e')
+      .select(
+        'e.id', 'e.title', 'e.main_organizer_id as mainOrganizer', 'ern.id as ernId',
+      )
+      .groupBy('e.id')
+      .join('event_resources_needed as ern', 'ern.event_id', 'e.id')
+      .join('event_followers as ef', 'ef.event_id', 'e.id')
+      .leftJoin('event_categories as ec', 'ec.event_id', 'e.id')
+      .where('e.is_active', true)
+      .where('ef.user_id', user.id)
+      .where('e.is_complete', false);
+
+    // Gets events based on resources searched
+    if (searchedResources.length > 0) {
+      eventQuery
+        .whereIn('ern.resource_id', searchedResources);
+    }
+
+    if (searchString) {
+      eventQuery
+        .where('e.title', 'like', `%${searchString}%`);
+    }
+
+    const events = await eventQuery;
+    const responseData = [];
+
+    for await (const event of events) {
+      const mainOrganizer = await DB('organizations as o')
+        .join('users as u', 'u.id', 'o.user_id')
+        .select('o.id as id', 'u.name as name')
+        .where('o.id', event.mainOrganizer)
+        .first();
+
+      const eventCategories = await DB('event_categories as ec')
+        .select('ec.category_id as id', 'c.name as name')
+        .join('categories as c', 'c.id', 'ec.category_id')
+        .where('ec.event_id', event.id);
+
+      const eventbeneficiaries = await DB('event_beneficiaries as eb')
+        .select('u.name as name', 'o.id as id')
+        .join('organizations as o', 'o.id', 'eb.organization_id')
+        .join('users as u', 'u.id', 'o.user_id')
+        .where('eb.event_id', event.id);
+
+      const eventOrganizers = await DB('event_organizers as eo')
+        .select('u.name as name', 'o.id as id')
+        .join('organizations as o', 'o.id', 'eo.organization_id')
+        .join('users as u', 'u.id', 'o.user_id')
+        .where('eo.event_id', event.id);
+
+      const eventResourcesProgress = await DB('resources as r')
+        .select('r.name as name', 'r.unit as unit', 'ern.resource_id as id', 'ern.quantity as neededQuantity', 'err.quantity as receivedQuantity')
+        .join('event_resources_needed as ern', 'r.id', 'ern.resource_id')
+        .leftJoin('event_resources_received as err', 'err.event_id', 'ern.event_id')
+        .where('ern.event_id', event.id);
+
+      let progress = 0;
+
+      if (eventResourcesProgress) {
+        for await (const resource of eventResourcesProgress) {
+          progress += resource.receivedQuantity / resource.neededQuantity;
+        }
+        progress = (progress * 100) / eventResourcesProgress.length;
+      }
+
+      responseData.push({
+        ...event,
+        categories: eventCategories,
+        beneficiaries: eventbeneficiaries,
+        mainOrganizer,
+        organizers: eventOrganizers,
+        progress,
+      });
+    }
+
+    return res.status(200).send(responseData);
+  } catch (err) {
+    console.log(err);
+    return res.status(500).send('Something went wrong');
+  }
+});
+
 module.exports = router;

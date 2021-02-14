@@ -10,6 +10,7 @@ const autocompleteRoutes = require('./controllers/autocomplete');
 const selectorsRoutes = require('./controllers/selectors');
 const eventRoutes = require('./controllers/events');
 const organizationRoutes = require('./controllers/organizations');
+const profileRoutes = require('./controllers/profile');
 
 // Read env variables
 
@@ -29,6 +30,7 @@ app.use('/autocomplete', autocompleteRoutes);
 app.use('/selectors', selectorsRoutes);
 app.use('/events', eventRoutes);
 app.use('/organizations', organizationRoutes);
+app.use('/profile', profileRoutes);
 
 app.listen(PORT, () => {
   console.log(`App is running on http://localhost:${PORT}`);
