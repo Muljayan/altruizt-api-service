@@ -4,6 +4,7 @@ const DB = require('../config/database');
 const router = express.Router();
 // const DB = require('../config/database');
 const extractToken = require('../utils/extractToken');
+const { getEventsPreviewData } = require('../helpers/events');
 
 router.post('/create', async (req, res) => {
   const trx = await DB.transaction();
@@ -72,7 +73,7 @@ router.post('/create', async (req, res) => {
     if (collaborators && collaborators.length > 0) {
       for await (const collaborator of collaborators) {
         await trx('event_organizers')
-          .insert({ event_id: eventId, category_id: collaborator.value });
+          .insert({ event_id: eventId, organization_id: collaborator.value });
       }
     }
 
@@ -87,11 +88,17 @@ router.post('/create', async (req, res) => {
     // Add event beneficiaries
     if (resources && resources.length > 0) {
       for await (const resource of resources) {
-        const resourceId = await trx('resources')
+        let resourceId = await trx('resources')
           .select('id')
           .where('name', resource.name.toString().toLowerCase())
           .first();
-
+        if (!resourceId) {
+          resourceId = await trx('resources')
+            .insert({
+              name: resource.name.toString().toLowerCase(),
+              unit: resource.unit.toString().toLowerCase(),
+            });
+        }
         await trx('event_resources_needed')
           .insert({ event_id: eventId, resource_id: resourceId.id, quantity: resource.quantity });
         await trx('event_resources_received')
@@ -101,6 +108,143 @@ router.post('/create', async (req, res) => {
 
     trx.commit();
     return res.status(201).send({ success: true, message: 'Event created succesfully', eventId });
+  } catch (err) {
+    trx.rollback();
+    console.log(err);
+    return res.status(400).send('Invalid user inputs');
+  }
+});
+
+router.put('/profile/:id/update', async (req, res) => {
+  const { id } = req.params;
+  const trx = await DB.transaction();
+  try {
+    const tokenData = extractToken(req);
+    const { organization } = tokenData;
+    // TODO move this to middleware
+    if (!organization) {
+      return res.status(401).send({ message: 'Your cannot create events!' });
+    }
+
+    const {
+      title,
+      startDate,
+      endDate,
+      contactName,
+      phone,
+      location,
+      description,
+      bankName,
+      bankBranch,
+      bankNumber,
+      categories,
+      resources,
+      collaborators,
+      beneficiaries,
+      resourcesReceived,
+      updateDescription,
+    } = req.body;
+
+    if (resources.length < 1) {
+      return res.status(400).send('Resources needed not added');
+    }
+    if (beneficiaries.length < 1) {
+      return res.status(400).send('Beneficiaries not added');
+    }
+
+    const data = {
+      title,
+      description,
+      start_date: startDate,
+      end_date: endDate,
+      location,
+      contact_name: contactName,
+      phone,
+      bank_account_name: bankName,
+      bank_account_number: bankNumber,
+      bank_account_branch: bankBranch,
+    };
+    await trx('events')
+      .update(data)
+      .where('id', id);
+
+    // Add event categories
+    if (categories && categories.length > 0) {
+      await trx('event_categories')
+        .delete()
+        .where('event_id', id);
+      for await (const category of categories) {
+        await trx('event_categories')
+          .insert({ event_id: id, category_id: category.value });
+      }
+    }
+
+    await trx('event_organizers')
+      .delete()
+      .where('event_id', id);
+    // Add event organizers
+    if (collaborators && collaborators.length > 0) {
+      for await (const collaborator of collaborators) {
+        console.log({ collaborator });
+        await trx('event_organizers')
+          .insert({ event_id: id, organization_id: collaborator.value });
+      }
+    }
+
+    // Add event beneficiaries
+    if (beneficiaries && beneficiaries.length > 0) {
+      await trx('event_beneficiaries')
+        .delete()
+        .where('event_id', id);
+      for await (const beneficiary of beneficiaries) {
+        await trx('event_beneficiaries')
+          .insert({ event_id: id, organization_id: beneficiary.value });
+      }
+    }
+
+    // Add event beneficiaries
+    // Add event beneficiaries
+    if (resources && resources.length > 0) {
+      await trx('event_resources_needed')
+        .delete()
+        .where('event_id', id);
+      await trx('event_resources_received')
+        .delete()
+        .where('event_id', id);
+      for await (const resource of resources) {
+        let resourceId = await trx('resources')
+          .select('id')
+          .where('name', resource.name.toString().toLowerCase())
+          .first();
+        if (!resourceId) {
+          resourceId = await trx('resources')
+            .insert({
+              name: resource.name.toString().toLowerCase(),
+              unit: resource.unit.toString().toLowerCase(),
+            });
+        }
+        await trx('event_resources_needed')
+          .insert({ event_id: id, resource_id: resourceId.id, quantity: resource.quantity });
+        await trx('event_resources_received')
+          .insert({ event_id: id, resource_id: resourceId.id, quantity: 0 });
+      }
+    }
+    if (resourcesReceived && resourcesReceived.length > 0) {
+      for await (const resource of resourcesReceived) {
+        const retrievedResource = await trx('resources')
+          .where('name', resource.name.toString().toLowerCase())
+          .first();
+        if (retrievedResource) {
+          await trx('event_resources_received')
+            .update({ quantity: resource.quantity })
+            .where('event_id', id)
+            .where('resource_id', retrievedResource.id);
+        }
+      }
+    }
+
+    trx.commit();
+    return res.status(201).send({ success: true, message: 'Event created succesfully', id });
   } catch (err) {
     trx.rollback();
     console.log(err);
@@ -267,52 +411,8 @@ router.post('/', async (req, res) => {
     const responseData = [];
 
     for await (const event of events) {
-      const mainOrganizer = await DB('organizations as o')
-        .join('users as u', 'u.id', 'o.user_id')
-        .select('o.id as id', 'u.name as name')
-        .where('o.id', event.mainOrganizer)
-        .first();
-
-      const eventCategories = await DB('event_categories as ec')
-        .select('ec.category_id as id', 'c.name as name')
-        .join('categories as c', 'c.id', 'ec.category_id')
-        .where('ec.event_id', event.id);
-
-      const eventbeneficiaries = await DB('event_beneficiaries as eb')
-        .select('u.name as name', 'o.id as id')
-        .join('organizations as o', 'o.id', 'eb.organization_id')
-        .join('users as u', 'u.id', 'o.user_id')
-        .where('eb.event_id', event.id);
-
-      const eventOrganizers = await DB('event_organizers as eo')
-        .select('u.name as name', 'o.id as id')
-        .join('organizations as o', 'o.id', 'eo.organization_id')
-        .join('users as u', 'u.id', 'o.user_id')
-        .where('eo.event_id', event.id);
-
-      const eventResourcesProgress = await DB('resources as r')
-        .select('r.name as name', 'r.unit as unit', 'ern.resource_id as id', 'ern.quantity as neededQuantity', 'err.quantity as receivedQuantity')
-        .join('event_resources_needed as ern', 'r.id', 'ern.resource_id')
-        .leftJoin('event_resources_received as err', 'err.event_id', 'ern.event_id')
-        .where('ern.event_id', event.id);
-
-      let progress = 0;
-
-      if (eventResourcesProgress) {
-        for await (const resource of eventResourcesProgress) {
-          progress += resource.receivedQuantity / resource.neededQuantity;
-        }
-        progress = (progress * 100) / eventResourcesProgress.length;
-      }
-
-      responseData.push({
-        ...event,
-        categories: eventCategories,
-        beneficiaries: eventbeneficiaries,
-        mainOrganizer,
-        organizers: eventOrganizers,
-        progress,
-      });
+      const eventData = await getEventsPreviewData(event, DB);
+      responseData.push(eventData);
     }
 
     return res.status(200).send(responseData);
@@ -323,8 +423,6 @@ router.post('/', async (req, res) => {
 });
 
 router.get('/suggestions', async (req, res) => {
-  const tokenData = extractToken(req);
-  console.log(tokenData);
   try {
     const categories = await DB('categories')
       .select('id', 'name');
