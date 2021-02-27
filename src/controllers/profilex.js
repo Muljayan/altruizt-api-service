@@ -1,12 +1,9 @@
-const express = require('express');
+import DB from '../config/database';
+import convertToSlug from '../utils/convertToSlug';
+import extractToken from '../utils/extractToken';
 
-const router = express.Router();
-
-const DB = require('../config/database');
-const convertToSlug = require('../utils/convertToSlug');
-const extractToken = require('../utils/extractToken');
-
-router.get('/', async (req, res) => {
+// router.get('/',);
+export const getProfile = async (req, res) => {
   const tokenData = extractToken(req);
   const { user: u, organization: o } = tokenData;
   console.log(u, o);
@@ -84,9 +81,9 @@ router.get('/', async (req, res) => {
     console.log(err);
     return res.status(400).send({ message: 'invalid user inputs' });
   }
-});
+};
 
-router.post('/edit', async (req, res) => {
+export const editProfile = async (req, res) => {
   const tokenData = extractToken(req);
   const { user: u, organization: o } = tokenData;
   // Create transaction object
@@ -246,6 +243,4 @@ router.post('/edit', async (req, res) => {
     console.log(err);
     return res.status(400).send({ message: 'invalid user inputs' });
   }
-});
-
-module.exports = router;
+};

@@ -1,11 +1,9 @@
-const express = require('express');
-const DB = require('../config/database');
-const { getEventsPreviewData } = require('../helpers/events');
-const { getOrganizationActivationStatus } = require('../helpers/organizations');
+import DB from '../config/database';
+import { getEventsPreviewData } from '../helpers/events';
+import { getOrganizationActivationStatus } from '../helpers/organizations';
 
-const router = express.Router();
-
-router.post('/', async (req, res) => {
+// router.post('/', async (req, res) => {
+export const searchOrganizations = async (req, res) => {
   console.log('/organizations');
   const { searchString, isBeneficiary, resources } = req.body;
 
@@ -64,9 +62,10 @@ router.post('/', async (req, res) => {
     console.log(err);
     return res.status(500).send('Something went wrong');
   }
-});
+};
 
-router.get('/profile/:id', async (req, res) => {
+// router.get('/profile/:id', );
+export const getOrganizationProfile = async (req, res) => {
   const { id } = req.params;
   try {
     const organization = await DB('organizations as o')
@@ -143,9 +142,10 @@ router.get('/profile/:id', async (req, res) => {
     console.log(err);
     return res.status(500).send('Something went wrong');
   }
-});
+};
 
-router.put('/profile/:id/toggle-activation-status', async (req, res) => {
+// router.put('/profile/:id/toggle-activation-status', );
+export const toggleActivationStatus = async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -163,6 +163,4 @@ router.put('/profile/:id/toggle-activation-status', async (req, res) => {
     console.log(err);
     return res.status(500).send('Something went wrong');
   }
-});
-
-module.exports = router;
+};

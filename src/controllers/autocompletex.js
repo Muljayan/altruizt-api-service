@@ -1,9 +1,6 @@
-const express = require('express');
+import DB from '../config/database';
 
-const router = express.Router();
-const DB = require('../config/database');
-
-router.post('/resources', async (req, res) => {
+export const getResources = async (req, res) => {
   try {
     const {
       text,
@@ -22,6 +19,8 @@ router.post('/resources', async (req, res) => {
     console.log(err);
     return res.status(400).send('Invalid user inputs');
   }
-});
+};
 
-module.exports = router;
+export default {
+  getResources,
+};

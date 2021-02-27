@@ -3,4 +3,4 @@ const convertToSlug = (text) => text
   .replace(/[^\w ]+/g, '')
   .replace(/ +/g, '-');
 
-module.exports = convertToSlug;
+export default convertToSlug;

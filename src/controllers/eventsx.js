@@ -1,12 +1,10 @@
-const express = require('express');
-const DB = require('../config/database');
+import DB from '../config/database';
 
-const router = express.Router();
-// const DB = require('../config/database');
-const extractToken = require('../utils/extractToken');
-const { getEventsPreviewData } = require('../helpers/events');
+import extractToken from '../utils/extractToken';
+import { getEventsPreviewData } from '../helpers/events';
 
-router.post('/create', async (req, res) => {
+// router.post('/create', async (req, res) => {
+export const createEvent = async (req, res) => {
   const trx = await DB.transaction();
   try {
     const tokenData = extractToken(req);
@@ -113,9 +111,10 @@ router.post('/create', async (req, res) => {
     console.log(err);
     return res.status(400).send('Invalid user inputs');
   }
-});
+};
 
-router.put('/profile/:id/update', async (req, res) => {
+// router.put('/profile/:id/update'
+export const updateEventProfile = async (req, res) => {
   const { id } = req.params;
   const trx = await DB.transaction();
   try {
@@ -250,9 +249,10 @@ router.put('/profile/:id/update', async (req, res) => {
     console.log(err);
     return res.status(400).send('Invalid user inputs');
   }
-});
+};
 
-router.get('/profile/:id', async (req, res) => {
+// router.get('/profile/:id', async (req, res) => {
+export const getEventProfile = async (req, res) => {
   const { id } = req.params;
   const tokenData = extractToken(req);
   const trx = await DB.transaction();
@@ -368,9 +368,10 @@ router.get('/profile/:id', async (req, res) => {
     console.log(err);
     return res.status(500).send('Something went wrong');
   }
-});
+};
 
-router.post('/', async (req, res) => {
+// router.post('/', async (req, res) => {
+export const searchEvents = async (req, res) => {
   const tokenData = extractToken(req);
   const { searchString, resources, personalized } = req.body;
   try {
@@ -420,9 +421,10 @@ router.post('/', async (req, res) => {
     console.log(err);
     return res.status(500).send('Something went wrong');
   }
-});
+};
 
-router.get('/suggestions', async (req, res) => {
+// router.get('/suggestions', );
+export const getEventSuggestions = async (req, res) => {
   try {
     const categories = await DB('categories')
       .select('id', 'name');
@@ -444,9 +446,10 @@ router.get('/suggestions', async (req, res) => {
     console.log(err);
     return res.status(400).send({ message: 'invalid user inputs' });
   }
-});
+};
 
-router.post('/followings', async (req, res) => {
+// router.post('/followings', );
+export const searchEventsFollowed = async (req, res) => {
   const tokenData = extractToken(req);
   const { searchString, resources } = req.body;
   const { user } = tokenData;
@@ -533,6 +536,4 @@ router.post('/followings', async (req, res) => {
     console.log(err);
     return res.status(500).send('Something went wrong');
   }
-});
-
-module.exports = router;
+};

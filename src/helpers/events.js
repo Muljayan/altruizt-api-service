@@ -1,4 +1,4 @@
-const getEventsPreviewData = async (event, DB) => {
+export const getEventsPreviewData = async (event, DB) => {
   const mainOrganizer = await DB('organizations as o')
     .join('users as u', 'u.id', 'o.user_id')
     .select('o.id as id', 'u.name as name')
@@ -48,6 +48,6 @@ const getEventsPreviewData = async (event, DB) => {
   // responseData.push();
 };
 
-module.exports = {
+export default {
   getEventsPreviewData,
 };

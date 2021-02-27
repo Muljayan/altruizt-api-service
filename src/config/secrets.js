@@ -1,5 +1,5 @@
-const { JWT_SECRET } = process.env;
+export const { JWT_SECRET } = process.env;
 
-module.exports = {
+export default {
   JWT_SECRET,
 };

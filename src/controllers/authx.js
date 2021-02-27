@@ -1,13 +1,10 @@
-const express = require('express');
-const jwt = require('jsonwebtoken');
+import jwt from 'jsonwebtoken';
 
-const router = express.Router();
+import DB from '../config/database';
+import { JWT_SECRET } from '../config/secrets';
+import convertToSlug from '../utils/convertToSlug';
 
-const DB = require('../config/database');
-const { JWT_SECRET } = require('../config/secrets');
-const convertToSlug = require('../utils/convertToSlug');
-
-router.post('/register', async (req, res) => {
+export const register = async (req, res) => {
   // Create transaction object
   const trx = await DB.transaction();
   try {
@@ -146,9 +143,9 @@ router.post('/register', async (req, res) => {
     console.log(err);
     return res.status(400).send({ message: 'invalid user inputs' });
   }
-});
+};
 
-router.post('/login', async (req, res) => {
+export const login = async (req, res) => {
   try {
     const {
       email,
@@ -219,6 +216,4 @@ router.post('/login', async (req, res) => {
     console.log(err);
     return res.status(400).send({ message: 'invalid user inputs' });
   }
-});
-
-module.exports = router;
+};

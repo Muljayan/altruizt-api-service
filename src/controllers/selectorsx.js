@@ -1,9 +1,7 @@
-const express = require('express');
+import DB from '../config/database';
 
-const router = express.Router();
-const DB = require('../config/database');
-
-router.get('/categories', async (req, res) => {
+// router.get('/categories', );
+export const getCategories = async (req, res) => {
   try {
     const categories = await DB('categories')
       .select('id as value', 'name as label');
@@ -13,9 +11,10 @@ router.get('/categories', async (req, res) => {
     console.log(err);
     return res.status(400).send({ message: 'Invalid user inputs' });
   }
-});
+};
 
-router.get('/organization-types', async (req, res) => {
+// router.get('/organization-types',);
+export const getOrganizationTypes = async (req, res) => {
   try {
     const categories = await DB('organization_types')
       .select('id as value', 'name as label');
@@ -25,9 +24,10 @@ router.get('/organization-types', async (req, res) => {
     console.log(err);
     return res.status(400).send({ message: 'Invalid user inputs' });
   }
-});
+};
 
-router.get('/organizers', async (req, res) => {
+// router.get('/organizers', );
+export const getOrganizations = async (req, res) => {
   try {
     const organizers = await DB('organizations as o')
       .select('o.id as value', 'u.name as label')
@@ -39,9 +39,10 @@ router.get('/organizers', async (req, res) => {
     console.log(err);
     return res.status(400).send('Invalid user inputs');
   }
-});
+};
 
-router.get('/beneficiaries', async (req, res) => {
+// router.get('/beneficiaries', );
+export const getBeneficiaries = async (req, res) => {
   try {
     const beneficiaries = await DB('organizations as o')
       .select('o.id as value', 'u.name as label')
@@ -53,9 +54,10 @@ router.get('/beneficiaries', async (req, res) => {
     console.log(err);
     return res.status(400).send('Invalid user inputs');
   }
-});
+};
 
-router.get('/resources', async (req, res) => {
+// router.get('/resources',);
+export const getResources = async (req, res) => {
   try {
     const resources = await DB('resources')
       .select('id as value', 'name as label');
@@ -65,6 +67,4 @@ router.get('/resources', async (req, res) => {
     console.log(err);
     return res.status(400).send('Invalid user inputs');
   }
-});
-
-module.exports = router;
+};

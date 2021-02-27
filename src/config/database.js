@@ -1,4 +1,4 @@
-const knex = require('knex');
+import knex from 'knex';
 
 const DATABASE = process.env.DB_NAME;
 const PASSWORD = process.env.DB_PW;
@@ -13,4 +13,4 @@ const DB = knex({
   },
 });
 
-module.exports = DB;
+export default DB;
