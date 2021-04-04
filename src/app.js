@@ -4,12 +4,14 @@ import { json } from 'body-parser';
 import cors from 'cors';
 
 import routes from './routes';
+import { ASSETS_DIRECTORY } from './config/directories';
 
 const app = express();
 
 // Express middlewares
 app.use(json({ limit: '10mb' }));
 app.use(cors());
+app.use(express.static(ASSETS_DIRECTORY));
 
 // Route Setup
 app.use('/', routes);

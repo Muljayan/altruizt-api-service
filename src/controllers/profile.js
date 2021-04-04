@@ -1,20 +1,19 @@
+import { promises as fs } from 'fs';
+
 import DB from '../config/database';
+import { USER_IMAGE_DIRECTORY } from '../config/directories';
 import convertToSlug from '../utils/convertToSlug';
 import extractToken from '../utils/extractToken';
+import { imageExtractor } from '../utils/extractors';
 
 // router.get('/',);
 export const getProfile = async (req, res) => {
+  console.log('getnprofile')
   const tokenData = extractToken(req);
   const { user: u, organization: o } = tokenData;
-  console.log(u, o);
-
-  // const isAnOrganization = (userType === 'organization');
-  // const isABeneficiary = (o.organizationTypeId === 3);
-  // const isACorporate = (o.organizationTypeId === 1);
-  // Create transaction object
   try {
     const user = await DB('users')
-      .select('id', 'name', 'email', 'description', 'contact_number as phone')
+      .select('id', 'name', 'email', 'description', 'contact_number as phone', 'image')
       .where('id', u.id)
       .first();
 
@@ -42,10 +41,7 @@ export const getProfile = async (req, res) => {
         .join('categories as c', 'c.id', 'oc.category_id')
         .where('oc.organization_id', o.id);
 
-      categoriesFollowed = await DB('categories_followed as cf')
-        .select('c.name as label', 'c.id as value')
-        .join('categories as c', 'c.id', 'cf.category_id')
-        .where('cf.user_id', u.id);
+      console.log({ categoriesFollowed });
 
       if (organizationType.value === 3) {
         // resources needed
@@ -61,6 +57,11 @@ export const getProfile = async (req, res) => {
           .where('ra.organization_id', o.id);
       }
     }
+
+    categoriesFollowed = await DB('categories_followed as cf')
+      .select('c.name as label', 'c.id as value')
+      .join('categories as c', 'c.id', 'cf.category_id')
+      .where('cf.user_id', u.id);
 
     let userType = { value: 'individual', label: 'Individual' };
     if (o) {
@@ -90,6 +91,7 @@ export const editProfile = async (req, res) => {
   const trx = await DB.transaction();
   try {
     const {
+      image,
       name,
       email,
       password,
@@ -101,14 +103,12 @@ export const editProfile = async (req, res) => {
       categories,
       categoriesFollowed,
       resources,
-      // -----------------------
     } = req.body;
-
     const isAnOrganization = !!o;
-    const isABeneficiary = (o.organizationType === 3);
-    const isACorporate = (o.organizationType === 1);
+    const isABeneficiary = (isAnOrganization && (o.organizationType === 3));
+    const isACorporate = (isAnOrganization && (o.organizationType === 1));
 
-    if (!name || !password || !email) {
+    if (!name || !email) {
       return res.status(400).send({ message: 'Name, password and/or email is missing!' });
     }
 
@@ -147,19 +147,17 @@ export const editProfile = async (req, res) => {
     if (password) {
       userData.password = password;
     }
-    console.log(userData);
 
     await trx('users')
       .update(userData)
       .where('id', u.id);
 
-    // categoriesFollowed
+    // categoriesFollowede
     if (categoriesFollowed && categoriesFollowed.length > 0) {
       await trx('categories_followed')
         .where('user_id', u.id)
         .delete();
       for await (const categoryFollowed of categoriesFollowed) {
-        console.log({ categoryFollowed });
         await trx('categories_followed')
           .insert({ user_id: u.id, category_id: categoryFollowed.value });
       }
@@ -233,6 +231,30 @@ export const editProfile = async (req, res) => {
             .insert({ organization_id: organizationId, category_id: category.value });
         }
       }
+    }
+    if (image && image.value) {
+      const { extension, fmtImg } = imageExtractor(image);
+
+      try {
+        const userImage = await trx('users')
+          .select('image')
+          .where('id', u.id);
+
+        const currentImageLocation = `${USER_IMAGE_DIRECTORY}/${userImage.image}`;
+
+        await fs.stat(currentImageLocation);
+        await fs.unlink(currentImageLocation);
+      } catch (err) {
+        console.log('file does not exist for user');
+      }
+      const imageName = `${u.id}.${extension}`;
+
+      const imagePath = `${USER_IMAGE_DIRECTORY}/${imageName}`;
+      await fs.writeFile(imagePath, fmtImg, 'base64');
+
+      await trx('users')
+        .where('id', u.id)
+        .update({ image: imageName });
     }
 
     trx.commit();

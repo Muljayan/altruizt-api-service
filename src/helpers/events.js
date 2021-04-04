@@ -1,7 +1,7 @@
 export const getEventsPreviewData = async (event, DB) => {
   const mainOrganizer = await DB('organizations as o')
     .join('users as u', 'u.id', 'o.user_id')
-    .select('o.id as id', 'u.name as name')
+    .select('o.id as id', 'u.name as name', 'u.image as image')
     .where('o.id', event.mainOrganizer)
     .first();
 
@@ -11,13 +11,13 @@ export const getEventsPreviewData = async (event, DB) => {
     .where('ec.event_id', event.id);
 
   const eventbeneficiaries = await DB('event_beneficiaries as eb')
-    .select('u.name as name', 'o.id as id')
+    .select('u.name as name', 'o.id as id', 'u.image as image')
     .join('organizations as o', 'o.id', 'eb.organization_id')
     .join('users as u', 'u.id', 'o.user_id')
     .where('eb.event_id', event.id);
 
   const eventOrganizers = await DB('event_organizers as eo')
-    .select('u.name as name', 'o.id as id')
+    .select('u.name as name', 'o.id as id', 'u.image as image')
     .join('organizations as o', 'o.id', 'eo.organization_id')
     .join('users as u', 'u.id', 'o.user_id')
     .where('eo.event_id', event.id);
@@ -25,14 +25,17 @@ export const getEventsPreviewData = async (event, DB) => {
   const eventResourcesProgress = await DB('resources as r')
     .select('r.name as name', 'r.unit as unit', 'ern.resource_id as id', 'ern.quantity as neededQuantity', 'err.quantity as receivedQuantity')
     .join('event_resources_needed as ern', 'r.id', 'ern.resource_id')
-    .leftJoin('event_resources_received as err', 'err.event_id', 'ern.event_id')
-    .where('ern.event_id', event.id);
-
+    .leftJoin('event_resources_received as err', 'r.id', 'err.resource_id')
+    .where('ern.event_id', event.id)
+    .where('err.event_id', event.id)
+    .groupBy('r.id');
+  // console.log({ id: event.id, eventResourcesProgress });
   let progress = 0;
 
   if (eventResourcesProgress) {
     for await (const resource of eventResourcesProgress) {
-      progress += resource.receivedQuantity / resource.neededQuantity;
+      const calculatedValue = resource.receivedQuantity / resource.neededQuantity;
+      progress += (calculatedValue > 1 ? 1 : calculatedValue);
     }
     progress = (progress * 100) / eventResourcesProgress.length;
   }

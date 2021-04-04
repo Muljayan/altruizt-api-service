@@ -4,7 +4,6 @@ import { getOrganizationActivationStatus } from '../helpers/organizations';
 
 // router.post('/', async (req, res) => {
 export const searchOrganizations = async (req, res) => {
-  console.log('/organizations');
   const { searchString, isBeneficiary, resources } = req.body;
 
   const searchedResources = resources.map((resource) => resource.value);
@@ -13,7 +12,7 @@ export const searchOrganizations = async (req, res) => {
     const organizationsQuery = DB('organizations as o')
       .join('users as u', 'u.id', 'o.user_id')
       .groupBy('o.id')
-      .select('o.id as id', 'u.name');
+      .select('o.id as id', 'u.name as name', 'u.image as image');
 
     if (isBeneficiary) {
       organizationsQuery
@@ -37,7 +36,6 @@ export const searchOrganizations = async (req, res) => {
     }
 
     const organizations = await organizationsQuery;
-    console.log(organizations);
 
     const responseData = [];
 
@@ -53,10 +51,6 @@ export const searchOrganizations = async (req, res) => {
       });
     }
 
-    // const responseData = {
-    //   organizations,
-    // };
-
     return res.status(200).send(responseData);
   } catch (err) {
     console.log(err);
@@ -70,7 +64,7 @@ export const getOrganizationProfile = async (req, res) => {
   try {
     const organization = await DB('organizations as o')
       .select(
-        'u.name as name', 'u.description as description', 'u.contact_number as phone',
+        'u.name as name', 'u.description as description', 'u.contact_number as phone', 'u.image as image',
         'o.address as address', 'o.website as website', 'o.identification_number as identificationNumber',
         'o.organization_type_id as type',
       )
@@ -159,6 +153,56 @@ export const toggleActivationStatus = async (req, res) => {
       .where('id', id);
     const responseData = await getOrganizationActivationStatus(DB);
     return res.status(200).send(responseData);
+  } catch (err) {
+    console.log(err);
+    return res.status(500).send('Something went wrong');
+  }
+};
+
+export const getIndividuals = async (req, res) => {
+  try {
+    const responseObj = {};
+    return res.status(500).send(responseObj);
+  } catch (err) {
+    console.log(err);
+    return res.status(500).send('Something went wrong');
+  }
+};
+
+export const getCorporates = async (req, res) => {
+  try {
+    const responseObj = {};
+    return res.status(500).send(responseObj);
+  } catch (err) {
+    console.log(err);
+    return res.status(500).send('Something went wrong');
+  }
+};
+
+export const getVolunteerOrganizations = async (req, res) => {
+  try {
+    const responseObj = {};
+    return res.status(500).send(responseObj);
+  } catch (err) {
+    console.log(err);
+    return res.status(500).send('Something went wrong');
+  }
+};
+
+export const getBeneficiaries = async (req, res) => {
+  try {
+    const responseObj = {};
+    return res.status(500).send(responseObj);
+  } catch (err) {
+    console.log(err);
+    return res.status(500).send('Something went wrong');
+  }
+};
+
+export const getEvents = async (req, res) => {
+  try {
+    const responseObj = {};
+    return res.status(500).send(responseObj);
   } catch (err) {
     console.log(err);
     return res.status(500).send('Something went wrong');

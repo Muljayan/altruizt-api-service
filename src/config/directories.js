@@ -1,0 +1,11 @@
+export const {
+  USER_IMAGE_DIRECTORY,
+  EVENT_IMAGE_DIRECTORY,
+  ASSETS_DIRECTORY,
+} = process.env;
+
+export default {
+  USER_IMAGE_DIRECTORY,
+  EVENT_IMAGE_DIRECTORY,
+  ASSETS_DIRECTORY,
+};

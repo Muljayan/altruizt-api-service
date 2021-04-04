@@ -153,16 +153,32 @@ export const login = async (req, res) => {
     } = req.body;
 
     const user = await DB('users')
-      .select('id', 'name', 'email', 'description', 'contact_number as contactNumber')
+      .select(
+        'id', 'name', 'email',
+        'description', 'contact_number as contactNumber',
+        'password', 'user_role_id as userRole',
+      )
       .where('email', email)
-      .where('password', password)
       .first();
 
     if (!user) {
-      return res.status(401).send({ message: 'your email or password is incorrect' });
+      return res.status(401).send({ message: 'No user found!' });
     }
+
+    // TODO hash and compare
+    if (user.password !== password) {
+      return res.status(401).send({ message: 'Invalid password' });
+    }
+
     let payload = {
-      user,
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        description: user.description,
+        contactNumber: user.contactNumber,
+      },
+      isSuperAdmin: !!(user.userRole === 1),
       organization: null,
       categoriesFollowed: [],
     };
