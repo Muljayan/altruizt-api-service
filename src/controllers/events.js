@@ -346,7 +346,6 @@ export const getEventProfile = async (req, res) => {
       .leftJoin('event_resources_received as err', 'r.id', 'err.resource_id')
       .where('ern.event_id', id)
       .where('err.event_id', id);
-    console.log({ eventResourcesProgress });
 
     const eventLogs = await trx('event_logs')
       .select('id', 'entry', 'date')
@@ -432,7 +431,6 @@ export const getEventProfile = async (req, res) => {
 
 // router.post('/', async (req, res) => {
 export const searchEvents = async (req, res) => {
-  console.log('searchEvents');
   const tokenData = extractToken(req);
   const { searchString, resources, personalized } = req.body;
   try {
@@ -477,7 +475,6 @@ export const searchEvents = async (req, res) => {
       const eventData = await getEventsPreviewData(event, DB);
       responseData.push(eventData);
     }
-    console.log({ responseData: responseData[0] });
     return res.status(200).send(responseData);
   } catch (err) {
     console.log(err);

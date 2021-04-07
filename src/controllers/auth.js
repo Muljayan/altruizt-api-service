@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcryptjs';
 
 import DB from '../config/database';
 import { JWT_SECRET } from '../config/secrets';
@@ -56,10 +57,12 @@ export const register = async (req, res) => {
       return res.status(400).send({ message: 'User already exists!' });
     }
 
+    const salt = bcrypt.genSaltSync(10);
+    const hashedPassword = bcrypt.hashSync(password, salt);
     const userData = {
       user_role_id: isAnOrganization ? 3 : 2,
       email,
-      password,
+      password: hashedPassword,
       name,
       description,
       contact_number: phone,
@@ -136,7 +139,6 @@ export const register = async (req, res) => {
     }
 
     trx.commit();
-    // TODO handle logo upload in profile section
     return res.status(201).send('successfully added user');
   } catch (err) {
     trx.rollback();
@@ -165,8 +167,9 @@ export const login = async (req, res) => {
       return res.status(401).send({ message: 'No user found!' });
     }
 
-    // TODO hash and compare
-    if (user.password !== password) {
+    const passwordMatch = bcrypt.compareSync(password, user.password);
+
+    if (!passwordMatch) {
       return res.status(401).send({ message: 'Invalid password' });
     }
 

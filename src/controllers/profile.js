@@ -8,7 +8,6 @@ import { imageExtractor } from '../utils/extractors';
 
 // router.get('/',);
 export const getProfile = async (req, res) => {
-  console.log('getnprofile')
   const tokenData = extractToken(req);
   const { user: u, organization: o } = tokenData;
   try {
@@ -41,8 +40,6 @@ export const getProfile = async (req, res) => {
         .join('categories as c', 'c.id', 'oc.category_id')
         .where('oc.organization_id', o.id);
 
-      console.log({ categoriesFollowed });
-
       if (organizationType.value === 3) {
         // resources needed
         resources = await DB('resources_needed as rn')
@@ -52,7 +49,7 @@ export const getProfile = async (req, res) => {
       } else {
         // resources available
         resources = await DB('resources_available as ra')
-          .select('r.name as name', 'r.unit as unit', 'rn.quantity as quantity')
+          .select('r.name as name', 'r.unit as unit', 'ra.quantity as quantity')
           .join('resources as r', 'r.id', 'ra.resource_id')
           .where('ra.organization_id', o.id);
       }
@@ -171,7 +168,7 @@ export const editProfile = async (req, res) => {
         identification_number: identificationNumber,
       };
 
-      const organizationId = await trx('organizations')
+      await trx('organizations')
         .update(organizationData)
         .where('id', o.id);
 
@@ -206,10 +203,11 @@ export const editProfile = async (req, res) => {
             resourceId = existingResource.id;
           }
           const resourceListData = {
-            organization_id: organizationId,
+            organization_id: o.id,
             resource_id: resourceId,
             quantity: resource.quantity,
           };
+          console.log({ resourceListData });
           // Charity organizations
           if (isABeneficiary) {
             await trx('resources_needed')
@@ -228,7 +226,7 @@ export const editProfile = async (req, res) => {
       if (categories && categories.length > 0) {
         for await (const category of categories) {
           await trx('organization_categories')
-            .insert({ organization_id: organizationId, category_id: category.value });
+            .insert({ organization_id: o.id, category_id: category.value });
         }
       }
     }

@@ -1,6 +1,7 @@
 import DB from '../config/database';
 import { getEventsPreviewData } from '../helpers/events';
 import { getOrganizationActivationStatus } from '../helpers/organizations';
+import extractToken from '../utils/extractToken';
 
 // router.post('/', async (req, res) => {
 export const searchOrganizations = async (req, res) => {
@@ -11,8 +12,9 @@ export const searchOrganizations = async (req, res) => {
   try {
     const organizationsQuery = DB('organizations as o')
       .join('users as u', 'u.id', 'o.user_id')
-      .groupBy('o.id')
-      .select('o.id as id', 'u.name as name', 'u.image as image');
+      .select('o.id as id', 'u.name as name', 'u.image as image')
+      .where('is_activated', true)
+      .groupBy('o.id');
 
     if (isBeneficiary) {
       organizationsQuery
@@ -60,18 +62,27 @@ export const searchOrganizations = async (req, res) => {
 
 // router.get('/profile/:id', );
 export const getOrganizationProfile = async (req, res) => {
+  const tokenData = extractToken(req);
   const { id } = req.params;
+  const allowable = (tokenData && tokenData.isSuperAdmin)
+    || (tokenData && tokenData.organization && tokenData.organization.id === id);
   try {
-    const organization = await DB('organizations as o')
+    const organizationQuery = DB('organizations as o')
       .select(
         'u.name as name', 'u.description as description', 'u.contact_number as phone', 'u.image as image',
         'o.address as address', 'o.website as website', 'o.identification_number as identificationNumber',
         'o.organization_type_id as type',
       )
       .join('users as u', 'u.id', 'o.user_id')
-      .where('is_activated', true)
+
       .where('o.id', id)
       .first();
+    if (!allowable) {
+      organizationQuery
+        .where('is_activated', true);
+    }
+
+    const organization = await organizationQuery;
 
     if (!organization) {
       return res.status(404).send('Not found');
