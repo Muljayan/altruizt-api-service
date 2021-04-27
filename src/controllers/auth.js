@@ -5,6 +5,11 @@ import DB from '../config/database';
 import { JWT_SECRET } from '../config/secrets';
 import convertToSlug from '../utils/convertToSlug';
 
+/**
+ * @route POST /auth/register
+ * @description Register User
+ * @access   Public
+ */
 export const register = async (req, res) => {
   // Create transaction object
   const trx = await DB.transaction();
@@ -147,6 +152,11 @@ export const register = async (req, res) => {
   }
 };
 
+/**
+ * @route POST /auth/login
+ * @description Login User
+ * @access   Public
+ */
 export const login = async (req, res) => {
   try {
     const {

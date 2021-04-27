@@ -207,7 +207,6 @@ export const editProfile = async (req, res) => {
             resource_id: resourceId,
             quantity: resource.quantity,
           };
-          console.log({ resourceListData });
           // Charity organizations
           if (isABeneficiary) {
             await trx('resources_needed')

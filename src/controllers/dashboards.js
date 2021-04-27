@@ -58,6 +58,7 @@ export const getOrganizationByType = async (req, res) => {
 
 // Only organizations and super admins
 export const getEvents = async (req, res) => {
+  // Currently only main organization has access to this.
   const tokenData = extractToken(req);
   try {
     const eventQuery = DB('events as e')
@@ -69,20 +70,23 @@ export const getEvents = async (req, res) => {
         'e.is_active as isActive',
         'e.is_complete as isComplete',
         'u.name as mainOrganizer',
-      );
+      )
+      .groupBy('e.id');
 
     if (tokenData && tokenData.organization) {
       eventQuery
-        .where('o.id', tokenData.organization.id);
+        .join('event_organizers as eo', 'eo.event_id', 'e.id')
+        .where('o.id', tokenData.organization.id)
+        .orWhere('eo.organization_id', tokenData.organization.id);
     }
 
     const events = await eventQuery;
-    console.log(events);
-
     for await (const event of events) {
       const pledgesCount = await DB('event_pledges')
-        .count('id')
-        .where('event_id', event.id);
+        .count('id as count')
+        .where('event_id', event.id)
+        .first();
+      console.log({ pledgesCount });
     }
     /*
     Name

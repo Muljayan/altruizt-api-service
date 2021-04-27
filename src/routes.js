@@ -1,5 +1,7 @@
 import express from 'express';
 
+import * as authenticate from './middleware/authenticate';
+
 import * as authController from './controllers/auth';
 import * as autoCompleteController from './controllers/autocomplete';
 import * as dashboardController from './controllers/dashboards';
@@ -17,28 +19,29 @@ router.post('/auth/login', authController.login);
 
 router.post('/autocomplete/resources', autoCompleteController.getResources);
 
-router.get('/dashboards/approvals', dashboardController.getUnapprovedOrganizations);
-router.get('/dashboards/organizations/:type', dashboardController.getOrganizationByType);
-router.get('/dashboards/individuals', dashboardController.getIndividuals);
-router.get('/dashboards/events', dashboardController.getEvents);
+router.get('/dashboards/approvals', authenticate.superadmin, dashboardController.getUnapprovedOrganizations);
+router.get('/dashboards/organizations/:type', authenticate.superadmin, dashboardController.getOrganizationByType);
+router.get('/dashboards/individuals', authenticate.superadmin, dashboardController.getIndividuals);
+router.get('/dashboards/events', authenticate.moderator, dashboardController.getEvents);
 
 router.post('/events/', eventsController.searchEvents);
-router.post('/events/create', eventsController.createEvent);
+router.post('/events/create', authenticate.organization, eventsController.createEvent);
 router.get('/events/profile/:id', eventsController.getEventProfile);
-router.put('/events/profile/:id/update', eventsController.updateEventProfile);
-router.get('/events/profile/:id/pledges', eventsController.getEventPledges);
-router.post('/events/followings', eventsController.searchEventsFollowed);
-router.get('/events/suggestions', eventsController.getEventSuggestions);
-router.put('/events/profile/:id/pledge', eventsController.toggleEventPledge);
-router.put('/events/profile/:id/follow', eventsController.toggleEventFollow);
+router.put('/events/profile/:id/update', authenticate.organization, eventsController.updateEventProfile);
+router.get('/events/profile/:id/pledges', authenticate.organization, eventsController.getEventPledges);
+router.post('/events/followings', authenticate.all, eventsController.searchEventsFollowed);
+router.get('/events/suggestions', authenticate.all, eventsController.getEventSuggestions);
+router.put('/events/profile/:id/pledge', authenticate.all, eventsController.toggleEventPledge);
+router.put('/events/profile/:id/follow', authenticate.all, eventsController.toggleEventFollow);
+router.put('/events/profile/:id/toggle-activation-status', authenticate.moderator, eventsController.toggleActivationStatus);
 
 router.post('/organizations', organizationsController.searchOrganizations);
 router.get('/organizations/profile/:id', organizationsController.getOrganizationProfile);
-router.put('/organizations/profile/:id/toggle-activation-status', organizationsController.toggleActivationStatus);
+router.put('/organizations/profile/:id/toggle-activation-status', authenticate.superadmin, organizationsController.toggleActivationStatus);
 
-router.get('/profile', profilesController.getProfile);
+router.get('/profile', authenticate.all, profilesController.getProfile);
 // TODO change to put
-router.post('/profile/edit', profilesController.editProfile);
+router.post('/profile/edit', authenticate.all, profilesController.editProfile);
 
 router.get('/selectors/categories', selectorsProfile.getCategories);
 router.get('/selectors/organization-types', selectorsProfile.getOrganizationTypes);

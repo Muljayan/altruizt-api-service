@@ -29,7 +29,6 @@ export const getEventsPreviewData = async (event, DB) => {
     .where('ern.event_id', event.id)
     .where('err.event_id', event.id)
     .groupBy('r.id');
-  // console.log({ id: event.id, eventResourcesProgress });
   let progress = 0;
 
   if (eventResourcesProgress) {

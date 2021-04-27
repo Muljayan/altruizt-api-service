@@ -1,5 +1,10 @@
 import DB from '../config/database';
 
+/**
+ * @route POST /autocomplete/resources
+ * @description Get all resources for autocomplete functionality
+ * @access   Public
+ */
 export const getResources = async (req, res) => {
   try {
     const {

@@ -91,7 +91,6 @@ export const createEvent = async (req, res) => {
     // Add event beneficiaries
     if (resources && resources.length > 0) {
       for await (const resource of resources) {
-        console.log({ resources });
         let resourceId;
         const fetchedResource = await trx('resources')
           .select('id')
@@ -296,7 +295,6 @@ export const updateEventProfile = async (req, res) => {
 
 // router.get('/profile/:id', async (req, res) => {
 export const getEventProfile = async (req, res) => {
-  console.log('getEventProfile');
   const { id } = req.params;
   const tokenData = extractToken(req);
   const trx = await DB.transaction();
@@ -374,7 +372,6 @@ export const getEventProfile = async (req, res) => {
         .where('event_id', id)
         .where('user_id', tokenData.user.id)
         .first();
-      console.log({ pledge });
       if (pledge) {
         eventPledged = true;
       }
@@ -382,7 +379,6 @@ export const getEventProfile = async (req, res) => {
         .where('event_id', id)
         .where('user_id', tokenData.user.id)
         .first();
-      console.log({ follow });
       if (follow) {
         eventFollowed = true;
       }
@@ -435,8 +431,14 @@ export const searchEvents = async (req, res) => {
   const { searchString, resources, personalized } = req.body;
   try {
     let categoriesFollowed = [];
-    if (tokenData && tokenData.categoriesFollowed && tokenData.categoriesFollowed.length > 0) {
-      categoriesFollowed = tokenData.categoriesFollowed.map((category) => category.id);
+    // if (tokenData && tokenData.categoriesFollowed && tokenData.categoriesFollowed.length > 0) {
+    //   categoriesFollowed = tokenData.categoriesFollowed.map((category) => category.id);
+    // }
+    if (tokenData && tokenData.user) {
+      const cat = await DB('categories_followed')
+        .select('category_id as categoryId')
+        .where('user_id', tokenData.user.id);
+      categoriesFollowed = cat.map((category) => category.categoryId);
     }
 
     const searchedResources = resources.map((resource) => resource.value);
@@ -680,7 +682,6 @@ export const toggleEventPledge = async (req, res) => {
         .where('event_id', id)
         .delete();
     } else {
-      console.log('pledged being added');
       // add
       const pledgeData = { user_id: user.id, event_id: id };
       await DB('event_pledges')
@@ -721,6 +722,27 @@ export const toggleEventRating = async (req, res) => {
         .insert(ratingData);
     }
     return res.status(200).send({ message: 'success' });
+  } catch (err) {
+    console.log(err);
+    return res.status(500).send('Something went wrong');
+  }
+};
+
+// router.put('/profile/:id/toggle-activation-status', );
+export const toggleActivationStatus = async (req, res) => {
+  const tokenData = extractToken(req);
+  try {
+    const { id } = req.params;
+
+    const organization = await DB('events')
+      .select('is_active as isActivated')
+      .where('id', id)
+      .first();
+
+    await DB('events')
+      .update({ is_active: !organization.isActivated })
+      .where('id', id);
+    return res.status(200).send();
   } catch (err) {
     console.log(err);
     return res.status(500).send('Something went wrong');
