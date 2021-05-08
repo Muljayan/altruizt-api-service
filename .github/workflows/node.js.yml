@@ -27,7 +27,6 @@ jobs:
     - run: npm -v
     - run: node -v
     - run: npm install
-    - run: npm run build
     - run: PORT=$PORT DB_NAME=$DB_NAME DB_PW=$DB_PW JWTSECRET=$JWTSECRET USER_IMAGE_DIRECTORY=$USER_IMAGE_DIRECTORY EVENT_IMAGE_DIRECTORY=$EVENT_IMAGE_DIRECTORY ASSETS_DIRECTORY=$ASSETS_DIRECTORY pm2 restart AltruiztAPI --update-env
       env:
         PORT: ${{ secrets.PORT }}
