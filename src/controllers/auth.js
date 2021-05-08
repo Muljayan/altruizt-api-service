@@ -158,6 +158,7 @@ export const register = async (req, res) => {
  * @access   Public
  */
 export const login = async (req, res) => {
+  console.log({ JWT_SECRET });
   try {
     const {
       email,
