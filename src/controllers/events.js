@@ -106,6 +106,7 @@ export const createEvent = async (req, res) => {
         } else {
           resourceId = fetchedResource.id;
         }
+
         await trx('event_resources_needed')
           .insert({ event_id: eventId, resource_id: resourceId, quantity: resource.quantity });
         await trx('event_resources_received')
@@ -155,7 +156,21 @@ export const updateEventProfile = async (req, res) => {
     const { organization } = tokenData;
     // TODO move this to middleware
     if (!organization) {
-      return res.status(401).send({ message: 'Your cannot create events!' });
+      return res.status(401).send({ message: 'Your cannot update this event!' });
+    }
+    const checkIfMainOrganizer = await DB('events as e')
+      .join('event_organizers as eo', 'eo.event_id', 'e.id')
+      .where('e.id', id)
+      .where('e.main_organizer_id', organization.id)
+      .first();
+    const checkIfCollaborator = await DB('events as e')
+      .join('event_organizers as eo', 'eo.event_id', 'e.id')
+      .where('e.id', id)
+      .where('eo.organization_id', id)
+      .first();
+
+    if (!(checkIfMainOrganizer || checkIfCollaborator)) {
+      return res.status(401).send({ message: 'Your cannot update this event!' });
     }
 
     const {
@@ -248,12 +263,14 @@ export const updateEventProfile = async (req, res) => {
           .where('name', resource.name.toString().toLowerCase())
           .first();
         if (!resourceId) {
-          resourceId = await trx('resources')
+          const insertedResource = await trx('resources')
             .insert({
               name: resource.name.toString().toLowerCase(),
               unit: resource.unit.toString().toLowerCase(),
             });
+          resourceId = { id: insertedResource[0] };
         }
+
         await trx('event_resources_needed')
           .insert({ event_id: id, resource_id: resourceId.id, quantity: resource.quantity });
         await trx('event_resources_received')
@@ -353,16 +370,19 @@ export const getEventProfile = async (req, res) => {
       .select('u.name as name', 'o.id as id', 'u.image as image')
       .join('organizations as o', 'o.id', 'eb.organization_id')
       .join('users as u', 'u.id', 'o.user_id')
+      .groupBy('o.id')
       .where('eb.event_id', id);
 
     const eventOrganizers = await trx('event_organizers as eo')
       .select('u.name as name', 'o.id as id', 'u.image as image')
       .join('organizations as o', 'o.id', 'eo.organization_id')
       .join('users as u', 'u.id', 'o.user_id')
+      .groupBy('o.id')
+      .whereNot('o.id', mainOrganizer.id)
       .where('eo.event_id', id);
 
     // Add main organizer in list
-    eventOrganizers.unshift(mainOrganizer);
+    // eventOrganizers.unshift(mainOrganizer);
 
     // Check if user follows or pledged to the event
     let eventPledged = false;
@@ -412,6 +432,7 @@ export const getEventProfile = async (req, res) => {
       logs: eventLogs,
       beneficiaries: eventbeneficiaries,
       organizers: eventOrganizers,
+      mainOrganizer,
       eventPledged,
       eventFollowed,
     };
@@ -427,6 +448,7 @@ export const getEventProfile = async (req, res) => {
 
 // router.post('/', async (req, res) => {
 export const searchEvents = async (req, res) => {
+  console.log('search events');
   const tokenData = extractToken(req);
   const { searchString, resources, personalized } = req.body;
   try {
@@ -604,6 +626,7 @@ export const searchEventsFollowed = async (req, res) => {
 
 // get /events/profile/:id/pledges
 export const getEventPledges = async (req, res) => {
+  console.log('getEventPledges');
   const { id } = req.params;
   const tokenData = extractToken(req);
   const { user } = tokenData;
@@ -730,7 +753,8 @@ export const toggleEventRating = async (req, res) => {
 
 // router.put('/profile/:id/toggle-activation-status', );
 export const toggleActivationStatus = async (req, res) => {
-  const tokenData = extractToken(req);
+  // TODO logic to avoid activation if deactivated by superadmin
+  // const tokenData = extractToken(req);
   try {
     const { id } = req.params;
 
