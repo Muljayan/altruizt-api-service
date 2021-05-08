@@ -16,7 +16,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [14.x]
+        node-version: [12.x]
 
     steps:
     - uses: actions/checkout@v2
@@ -24,9 +24,9 @@ jobs:
       uses: actions/setup-node@v1
       with:
         node-version: ${{ matrix.node-version }}
-    - run: npm i
     - run: npm -v
     - run: node -v
+    - run: npm install
     - run: npm run build
     - run: PORT=$PORT DB_NAME=$DB_NAME DB_PW=$DB_PW JWTSECRET=$JWTSECRET USER_IMAGE_DIRECTORY=$USER_IMAGE_DIRECTORY EVENT_IMAGE_DIRECTORY=$EVENT_IMAGE_DIRECTORY ASSETS_DIRECTORY=$ASSETS_DIRECTORY pm2 restart AltruiztAPI --update-env
       env:
