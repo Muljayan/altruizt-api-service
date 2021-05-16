@@ -27,7 +27,7 @@ const validateToken = (res, token) => {
 export const all = (req, res, next) => {
   const token = req.headers['x-auth-token'];
   const decodedToken = validateToken(res, token);
-  if (decodedToken) {
+  if (token && decodedToken) {
     next();
   }
 };
@@ -40,7 +40,7 @@ export const organization = (req, res, next) => {
     if (decodedToken && !decodedToken.organization) {
       throw new Error('Not an organization');
     }
-    if (decodedToken) {
+    if (token && decodedToken) {
       next();
     }
   } catch (err) {
@@ -62,7 +62,7 @@ export const moderator = (req, res, next) => {
     if (decodedToken && !(decodedToken.organization || decodedToken.isSuperAdmin)) {
       throw new Error('Not an organization or superadmin');
     }
-    if (decodedToken) {
+    if (token && decodedToken) {
       next();
     }
   } catch (err) {
@@ -84,7 +84,7 @@ export const superadmin = (req, res, next) => {
     if (decodedToken && (!decodedToken.isSuperAdmin)) {
       throw new Error('Not an organization or superadmin');
     }
-    if (decodedToken) {
+    if (token && decodedToken) {
       next();
     }
   } catch (err) {
