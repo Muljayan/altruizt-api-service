@@ -470,11 +470,11 @@ export const searchEvents = async (req, res) => {
         'e.id', 'e.title', 'e.main_organizer_id as mainOrganizer', 'ern.id as ernId',
         'e.image',
       )
-      .groupBy('e.id')
       .join('event_resources_needed as ern', 'ern.event_id', 'e.id')
       .leftJoin('event_categories as ec', 'ec.event_id', 'e.id')
       .where('e.is_active', true)
-      .where('e.is_complete', false);
+      .where('e.is_complete', false)
+      .groupBy('e.id');
 
     // Gets events based on categories user has followed
     if (categoriesFollowed.length > 0 && personalized) {
@@ -543,13 +543,13 @@ export const searchEventsFollowed = async (req, res) => {
       .select(
         'e.id', 'e.title', 'e.main_organizer_id as mainOrganizer', 'ern.id as ernId',
       )
-      .groupBy('e.id')
       .join('event_resources_needed as ern', 'ern.event_id', 'e.id')
       .join('event_followers as ef', 'ef.event_id', 'e.id')
       .leftJoin('event_categories as ec', 'ec.event_id', 'e.id')
       .where('e.is_active', true)
       .where('ef.user_id', user.id)
-      .where('e.is_complete', false);
+      .where('e.is_complete', false)
+      .groupBy('e.id');
 
     // Gets events based on resources searched
     if (searchedResources.length > 0) {
