@@ -190,6 +190,7 @@ export const updateEventProfile = async (req, res) => {
       beneficiaries,
       resourcesReceived,
       updateDescription,
+      image,
     } = req.body;
 
     if (resources.length < 1) {
@@ -300,6 +301,33 @@ export const updateEventProfile = async (req, res) => {
       await trx('event_logs')
         .insert(eventLogData);
     }
+
+    // -----------------------------------------------
+    if (image && image.value) {
+      const { extension, fmtImg } = imageExtractor(image);
+
+      try {
+        const eventImage = await trx('events')
+          .select('image')
+          .where('id', id);
+
+        const currentImageLocation = `${EVENT_IMAGE_DIRECTORY}/${eventImage.image}`;
+
+        await fs.stat(currentImageLocation);
+        await fs.unlink(currentImageLocation);
+      } catch (err) {
+        console.log('file does not exist for user');
+      }
+      const imageName = `${id}.${extension}`;
+
+      const imagePath = `${EVENT_IMAGE_DIRECTORY}/${imageName}`;
+      await fs.writeFile(imagePath, fmtImg, 'base64');
+
+      await trx('events')
+        .where('id', id)
+        .update({ image: imageName });
+    }
+    // -----------------------------------------------
 
     trx.commit();
     return res.status(201).send({ success: true, message: 'Event updated succesfully', id });
