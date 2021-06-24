@@ -36,12 +36,14 @@ export const register = async (req, res) => {
     const isACorporate = (organizationType === 1);
 
     if (!name || !password || !email) {
+      trx.rollback();
       return res.status(400).send({ message: 'Name, password and/or email is missing!' });
     }
 
     // It is compulsory for organizations to include the address and phone number
     if (isAnOrganization) {
       if (!address || !phone) {
+        trx.rollback();
         return res.status(400).send({ message: 'Address and/or Phone number is missing!' });
       }
     }
@@ -49,6 +51,7 @@ export const register = async (req, res) => {
     // Company registration number required for companies
     if (isACorporate) {
       if (!identificationNumber) {
+        trx.rollback();
         return res.status(400).send({ message: 'Organization\'s identification number is missing!' });
       }
     }
@@ -59,6 +62,7 @@ export const register = async (req, res) => {
       .first();
 
     if (existingUser) {
+      trx.rollback();
       return res.status(400).send({ message: 'User already exists!' });
     }
 

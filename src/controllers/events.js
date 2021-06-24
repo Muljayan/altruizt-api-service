@@ -15,6 +15,7 @@ export const createEvent = async (req, res) => {
     const { organization } = tokenData;
     // TODO move this to middleware
     if (!organization) {
+      trx.rollback();
       return res.status(401).send({ message: 'Your cannot create events!' });
     }
 
@@ -37,9 +38,11 @@ export const createEvent = async (req, res) => {
     } = req.body;
 
     if (resources.length < 1) {
+      trx.rollback();
       return res.status(400).send('Resources needed not added');
     }
     if (beneficiaries.length < 1) {
+      trx.rollback();
       return res.status(400).send('Beneficiaries not added');
     }
 
@@ -156,6 +159,7 @@ export const updateEventProfile = async (req, res) => {
     const { organization } = tokenData;
     // TODO move this to middleware
     if (!organization) {
+      trx.rollback();
       return res.status(401).send({ message: 'Your cannot update this event!' });
     }
     const checkIfMainOrganizer = await DB('events as e')
@@ -170,6 +174,7 @@ export const updateEventProfile = async (req, res) => {
       .first();
 
     if (!(checkIfMainOrganizer || checkIfCollaborator)) {
+      trx.rollback();
       return res.status(401).send({ message: 'Your cannot update this event!' });
     }
 
@@ -194,9 +199,11 @@ export const updateEventProfile = async (req, res) => {
     } = req.body;
 
     if (resources.length < 1) {
+      trx.rollback();
       return res.status(400).send('Resources needed not added');
     }
     if (beneficiaries.length < 1) {
+      trx.rollback();
       return res.status(400).send('Beneficiaries not added');
     }
 
@@ -346,6 +353,7 @@ export const getEventProfile = async (req, res) => {
 
   try {
     if (!id) {
+      trx.rollback();
       return res.status(404).send('Event does not exist!');
     }
 
@@ -359,6 +367,7 @@ export const getEventProfile = async (req, res) => {
       .first();
 
     if (!event) {
+      trx.rollback();
       return res.status(404).send('Event does not exist!');
     }
 
@@ -415,6 +424,8 @@ export const getEventProfile = async (req, res) => {
     // Check if user follows or pledged to the event
     let eventPledged = false;
     let eventFollowed = false;
+    let upvoted = false;
+    let downvoted = false;
     if (tokenData) {
       const pledge = await trx('event_pledges')
         .where('event_id', id)
@@ -429,6 +440,20 @@ export const getEventProfile = async (req, res) => {
         .first();
       if (follow) {
         eventFollowed = true;
+      }
+      const ratings = await trx('event_ratings')
+        .where('event_id', id)
+        .where('user_id', tokenData.user.id)
+        .select('value')
+        .first();
+      if (ratings) {
+        // eventFollowed = true;
+        if (Number(ratings.value) === -1) {
+          downvoted = true;
+        }
+        if (Number(ratings.value) === 1) {
+          upvoted = true;
+        }
       }
     }
 
@@ -463,8 +488,9 @@ export const getEventProfile = async (req, res) => {
       mainOrganizer,
       eventPledged,
       eventFollowed,
+      downvoted,
+      upvoted,
     };
-
     trx.commit();
     return res.status(200).send(responseData);
   } catch (err) {
@@ -476,7 +502,6 @@ export const getEventProfile = async (req, res) => {
 
 // router.post('/', async (req, res) => {
 export const searchEvents = async (req, res) => {
-  console.log('search events');
   const tokenData = extractToken(req);
   const { searchString, resources, personalized } = req.body;
   try {
@@ -531,31 +556,6 @@ export const searchEvents = async (req, res) => {
   } catch (err) {
     console.log(err);
     return res.status(500).send('Something went wrong');
-  }
-};
-
-// router.get('/suggestions', );
-export const getEventSuggestions = async (req, res) => {
-  try {
-    const categories = await DB('categories')
-      .select('id', 'name');
-
-    const responseData = [];
-
-    for await (const category of categories) {
-      const events = await DB('events as e')
-        .select('e.id as id', 'e.title as name', 'e.image as image')
-        .join('event_categories as ec', 'ec.event_id', 'e.id')
-        .where('ec.category_id', category.id);
-      if (events && events.length > 0) {
-        responseData.push({ ...category, events });
-      }
-    }
-
-    return res.status(201).send(responseData);
-  } catch (err) {
-    console.log(err);
-    return res.status(400).send({ message: 'invalid user inputs' });
   }
 };
 
@@ -708,6 +708,77 @@ export const toggleEventFollow = async (req, res) => {
       const followerData = { user_id: user.id, event_id: id };
       await DB('event_followers')
         .insert(followerData);
+    }
+    return res.status(200).send({ message: 'success' });
+  } catch (err) {
+    console.log(err);
+    return res.status(500).send('Something went wrong');
+  }
+};
+export const upvote = async (req, res) => {
+  const { id } = req.params;
+  const tokenData = extractToken(req);
+  const { user } = tokenData;
+  try {
+    const ratings = await DB('event_ratings')
+      .where('user_id', user.id)
+      .where('event_id', id)
+      .select('value')
+      .first();
+    if (ratings) {
+      // remove
+      if (Number(ratings.value) === 1) {
+        await DB('event_ratings')
+          .where('user_id', user.id)
+          .where('event_id', id)
+          .update({ value: 0 });
+      } else {
+        await DB('event_ratings')
+          .where('user_id', user.id)
+          .where('event_id', id)
+          .update({ value: 1 });
+      }
+    } else {
+      // add
+      const ratingData = { user_id: user.id, event_id: id, value: 1 };
+      await DB('event_ratings')
+        .insert(ratingData);
+    }
+    return res.status(200).send({ message: 'success' });
+  } catch (err) {
+    console.log(err);
+    return res.status(500).send('Something went wrong');
+  }
+};
+
+export const downvote = async (req, res) => {
+  const { id } = req.params;
+  const tokenData = extractToken(req);
+  const { user } = tokenData;
+  try {
+    const ratings = await DB('event_ratings')
+      .where('user_id', user.id)
+      .where('event_id', id)
+      .select('value')
+      .first();
+    if (ratings) {
+      // remove
+      if (Number(ratings.value) === -1) {
+        await DB('event_ratings')
+          .where('user_id', user.id)
+          .where('event_id', id)
+          .update({ value: 0 });
+      } else {
+        await DB('event_ratings')
+          .where('user_id', user.id)
+          .where('event_id', id)
+          .update({ value: -1 });
+      }
+    } else {
+      // add
+      const ratingData = { user_id: user.id, event_id: id, value: -1 };
+      await DB('event_ratings')
+        .insert(ratingData);
     }
     return res.status(200).send({ message: 'success' });
   } catch (err) {

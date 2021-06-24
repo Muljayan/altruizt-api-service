@@ -19,6 +19,7 @@ router.post('/auth/login', authController.login);
 
 router.post('/autocomplete/resources', autoCompleteController.getResources);
 
+router.get('/dashboards', authenticate.all, dashboardController.getDashboardData);
 router.get('/dashboards/approvals', authenticate.superadmin, dashboardController.getUnapprovedOrganizations);
 router.get('/dashboards/organizations/:type', authenticate.superadmin, dashboardController.getOrganizationByType);
 router.get('/dashboards/individuals', authenticate.superadmin, dashboardController.getIndividuals);
@@ -30,9 +31,10 @@ router.get('/events/profile/:id', eventsController.getEventProfile);
 router.put('/events/profile/:id/update', authenticate.organization, eventsController.updateEventProfile);
 router.get('/events/profile/:id/pledges', authenticate.organization, eventsController.getEventPledges);
 router.post('/events/followings', authenticate.all, eventsController.searchEventsFollowed);
-router.get('/events/suggestions', authenticate.all, eventsController.getEventSuggestions);
 router.put('/events/profile/:id/pledge', authenticate.all, eventsController.toggleEventPledge);
 router.put('/events/profile/:id/follow', authenticate.all, eventsController.toggleEventFollow);
+router.put('/events/profile/:id/upvote', authenticate.all, eventsController.upvote);
+router.put('/events/profile/:id/downvote', authenticate.all, eventsController.downvote);
 router.put('/events/profile/:id/toggle-activation-status', authenticate.moderator, eventsController.toggleActivationStatus);
 
 router.post('/organizations', organizationsController.searchOrganizations);
@@ -42,6 +44,7 @@ router.put('/organizations/profile/:id/toggle-activation-status', authenticate.s
 router.get('/profile', authenticate.all, profilesController.getProfile);
 // TODO change to put
 router.post('/profile/edit', authenticate.all, profilesController.editProfile);
+router.get('/profile/sidebar', authenticate.all, profilesController.getSidebar);
 
 router.get('/selectors/categories', selectorsProfile.getCategories);
 router.get('/selectors/organization-types', selectorsProfile.getOrganizationTypes);

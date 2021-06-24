@@ -47,9 +47,18 @@ export const searchOrganizations = async (req, res) => {
         .join('categories as c', 'c.id', 'oc.category_id')
         .where('organization_id', organization.id);
 
+      const opportunities = await DB('events as e')
+        .join('event_organizers as eo', 'eo.event_id', 'e.id')
+        .count('e.id as count')
+        // .where('e.')
+        .where('eo.organization_id', organization.id)
+        .orWhere('e.main_organizer_id', organization.id)
+        .first();
+
       responseData.push({
         ...organization,
         categories,
+        opportunities: opportunities ? opportunities.count : 0,
       });
     }
 
@@ -97,10 +106,20 @@ export const getOrganizationProfile = async (req, res) => {
         'e.id', 'e.title', 'e.main_organizer_id as mainOrganizer',
       )
       .groupBy('e.id')
-      .where('e.is_active', true);
+      .where('e.is_active', true)
+      .where('e.is_complete', false);
+
+    const pastEventQuery = DB('events as e')
+      .select(
+        'e.id', 'e.title', 'e.main_organizer_id as mainOrganizer',
+      )
+      .groupBy('e.id')
+      .where('e.is_active', true)
+      .where('e.is_complete', true);
 
     // Beneficiaries
     if (organization.type === 3) {
+      console.log('goes here');
       resources = await DB('resources_needed as rn')
         .select('r.id as id', 'r.name as name', 'r.unit as unit', 'rn.quantity as quantity')
         .join('resources as r', 'r.id', 'rn.resource_id')
@@ -110,7 +129,11 @@ export const getOrganizationProfile = async (req, res) => {
       eventQuery
         .join('event_beneficiaries as eb', 'eb.event_id', 'e.id')
         .where('eb.organization_id', id);
+      pastEventQuery
+        .join('event_beneficiaries as eb', 'eb.event_id', 'e.id')
+        .where('eb.organization_id', id);
     } else {
+      console.log('goes else');
       resources = await DB('resources_available as ra')
         .select('r.id as id', 'r.name as name', 'r.unit as unit', 'ra.quantity as quantity')
         .join('resources as r', 'r.id', 'ra.resource_id')
@@ -120,16 +143,19 @@ export const getOrganizationProfile = async (req, res) => {
         .join('event_organizers as eo', 'eo.event_id', 'e.id')
         .where('eo.organization_id', id)
         .orWhere('e.main_organizer_id', id);
+      pastEventQuery
+        .join('event_organizers as eo', 'eo.event_id', 'e.id')
+        .where('eo.organization_id', id)
+        .orWhere('e.main_organizer_id', id);
     }
-
-    const currentEventList = await eventQuery
-      .where('e.is_complete', false);
+    const currentEventList = await eventQuery;
+    console.log({ currentEventList });
     for await (const event of currentEventList) {
       const eventData = await getEventsPreviewData(event, DB);
       currentEvents.push(eventData);
     }
-    const pastEventList = await eventQuery
-      .where('e.is_complete', true);
+    const pastEventList = await pastEventQuery;
+    console.log({ pastEventList });
     for await (const event of pastEventList) {
       const eventData = await getEventsPreviewData(event, DB);
       pastEvents.push(eventData);

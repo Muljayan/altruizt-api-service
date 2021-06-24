@@ -50,6 +50,31 @@ export const getEventsPreviewData = async (event, DB) => {
   // responseData.push();
 };
 
+// export const getRecommendedOrganizations = async (id, DB) => {
+//   const organization = await DB('organizations as o')
+//     .select('organization_type_id as organizationType')
+//     .where('o.id', id)
+//     .first();
+
+//   const resourcesAvailable = [];
+//   const resourcesNeeded = [];
+
+//   // beneficieries
+//   if (organization.type === 3) {
+//     resources = await DB('resources_available as ra')
+//       .select('r.name as name', 'r.unit as unit', 'ra.quantity as quantity')
+//       .join('resources as r', 'r.id', 'ra.resource_id')
+//       .where('ra.organization_id', o.id);
+//   } else {
+//     // Corporates and Volunteer organizations
+//     resources = await DB('resources_needed as rn')
+//       .select('r.name as name', 'r.unit as unit', 'rn.quantity as quantity')
+//       .join('resources as r', 'r.id', 'rn.resource_id')
+//       .where('rn.organization_id', id);
+//   }
+
+// };
+
 export default {
   getEventsPreviewData,
 };

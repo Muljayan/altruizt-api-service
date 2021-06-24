@@ -74,6 +74,7 @@ export const getProfile = async (req, res) => {
       categoriesFollowed,
       resources,
     };
+    console.log('hit');
     return res.status(201).send(responseObject);
   } catch (err) {
     console.log(err);
@@ -106,12 +107,14 @@ export const editProfile = async (req, res) => {
     const isACorporate = (isAnOrganization && (o.organizationType === 1));
 
     if (!name || !email) {
+      trx.rollback();
       return res.status(400).send({ message: 'Name, password and/or email is missing!' });
     }
 
     // It is compulsory for organizations to include the address and phone number
     if (isAnOrganization) {
       if (!address || !phone) {
+        trx.rollback();
         return res.status(400).send({ message: 'Address and/or Phone number is missing!' });
       }
     }
@@ -119,6 +122,7 @@ export const editProfile = async (req, res) => {
     // Company registration number required for companies
     if (isACorporate) {
       if (!identificationNumber) {
+        trx.rollback();
         return res.status(400).send({ message: 'Organization\'s identification number is missing!' });
       }
     }
@@ -130,6 +134,7 @@ export const editProfile = async (req, res) => {
         .first();
 
       if (existingUser) {
+        trx.rollback();
         return res.status(400).send({ message: 'User already exists!' });
       }
     }
@@ -255,10 +260,44 @@ export const editProfile = async (req, res) => {
     }
 
     trx.commit();
-    // TODO handle logo upload in profile section
     return res.status(201).send('successfully updated user');
   } catch (err) {
     trx.rollback();
+    console.log(err);
+    return res.status(400).send({ message: 'invalid user inputs' });
+  }
+};
+
+// router.get('/sidebar', );
+export const getSidebar = async (req, res) => {
+  const tokenData = extractToken(req);
+  const { user } = tokenData;
+  try {
+    const categories = await DB('categories as c')
+      .join('categories_followed as cf', 'cf.category_id', 'c.id')
+      .select('c.id', 'c.name')
+      .where('cf.user_id', user.id)
+      .groupBy('c.id');
+
+    const suggestions = [];
+
+    for await (const category of categories) {
+      const events = await DB('events as e')
+        .select('e.id as id', 'e.title as name', 'e.image as image')
+        .join('event_categories as ec', 'ec.event_id', 'e.id')
+        .where('ec.category_id', category.id);
+      if (events && events.length > 0) {
+        suggestions.push({ ...category, events });
+      }
+    }
+
+    const responseData = {
+      categories,
+      suggestions,
+    };
+
+    return res.status(201).send(responseData);
+  } catch (err) {
     console.log(err);
     return res.status(400).send({ message: 'invalid user inputs' });
   }
