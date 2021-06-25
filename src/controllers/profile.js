@@ -103,8 +103,8 @@ export const editProfile = async (req, res) => {
       resources,
     } = req.body;
     const isAnOrganization = !!o;
-    const isABeneficiary = (isAnOrganization && (o.organizationType === 3));
-    const isACorporate = (isAnOrganization && (o.organizationType === 1));
+    const isABeneficiary = (isAnOrganization && (o.organizationTypeId === 3));
+    const isACorporate = (isAnOrganization && (o.organizationTypeId === 1));
 
     if (!name || !email) {
       trx.rollback();
@@ -126,8 +126,12 @@ export const editProfile = async (req, res) => {
         return res.status(400).send({ message: 'Organization\'s identification number is missing!' });
       }
     }
+    const dbUser = await trx('users')
+      .where('id', u.id)
+      .select('email')
+      .first();
 
-    if (u.email !== email) {
+    if (dbUser.email !== email) {
       // Generate a slug for url
       const existingUser = await trx('users')
         .where('email', email)
@@ -186,7 +190,6 @@ export const editProfile = async (req, res) => {
           .where('organization_id', o.id)
           .delete();
       }
-
       // Add resources to list
       // Check if resources available and is an organization
       if (resources && resources.length > 0) {
@@ -210,7 +213,7 @@ export const editProfile = async (req, res) => {
           const resourceListData = {
             organization_id: o.id,
             resource_id: resourceId,
-            quantity: resource.quantity,
+            quantity: Number(resource.quantity),
           };
           // Charity organizations
           if (isABeneficiary) {

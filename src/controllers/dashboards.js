@@ -67,8 +67,11 @@ export const getDashboardData = async (req, res) => {
         .leftJoin('event_organizers as eo', 'eo.event_id', 'e.id')
         .select('e.title', 'e.id as id', 'e.is_complete as isComplete', 'e.is_successful as isSuccessful')
         .groupBy('e.id')
-        .where('e.main_organizer_id', tokenData.organization.id)
-        .orWhere('eo.organization_id', tokenData.organization.id);
+        .where(function () {
+          this.where('e.main_organizer_id', tokenData.organization.id).orWhere('eo.organization_id', tokenData.organization.id);
+        });
+        // .where('e.main_organizer_id', tokenData.organization.id)
+        // .orWhere('eo.organization_id', tokenData.organization.id);
       // const X = await DB('events as e')
       //   .leftJoin('organizations as o', 'o.id', 'e.main_organizer_id')
       //   .leftJoin('event_organizers as eo', 'eo.event_id', 'e.id')

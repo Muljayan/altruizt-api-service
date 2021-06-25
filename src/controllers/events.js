@@ -163,14 +163,13 @@ export const updateEventProfile = async (req, res) => {
       return res.status(401).send({ message: 'Your cannot update this event!' });
     }
     const checkIfMainOrganizer = await DB('events as e')
-      .join('event_organizers as eo', 'eo.event_id', 'e.id')
       .where('e.id', id)
       .where('e.main_organizer_id', organization.id)
       .first();
     const checkIfCollaborator = await DB('events as e')
-      .join('event_organizers as eo', 'eo.event_id', 'e.id')
+      .leftJoin('event_organizers as eo', 'eo.event_id', 'e.id')
       .where('e.id', id)
-      .where('eo.organization_id', id)
+      .where('eo.organization_id', organization.id)
       .first();
 
     if (!(checkIfMainOrganizer || checkIfCollaborator)) {
@@ -654,7 +653,6 @@ export const searchEventsFollowed = async (req, res) => {
 
 // get /events/profile/:id/pledges
 export const getEventPledges = async (req, res) => {
-  console.log('getEventPledges');
   const { id } = req.params;
   const tokenData = extractToken(req);
   const { user } = tokenData;
