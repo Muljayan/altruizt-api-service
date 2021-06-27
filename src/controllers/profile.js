@@ -74,7 +74,6 @@ export const getProfile = async (req, res) => {
       categoriesFollowed,
       resources,
     };
-    console.log('hit');
     return res.status(201).send(responseObject);
   } catch (err) {
     console.log(err);

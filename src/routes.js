@@ -24,6 +24,8 @@ router.get('/dashboards/approvals', authenticate.superadmin, dashboardController
 router.get('/dashboards/organizations/:type', authenticate.superadmin, dashboardController.getOrganizationByType);
 router.get('/dashboards/individuals', authenticate.superadmin, dashboardController.getIndividuals);
 router.get('/dashboards/events', authenticate.moderator, dashboardController.getEvents);
+router.get('/dashboards/resources', authenticate.superadmin, dashboardController.getResources);
+router.get('/dashboards/categories', authenticate.superadmin, dashboardController.getCategories);
 
 router.post('/events/', eventsController.searchEvents);
 router.post('/events/create', authenticate.organization, eventsController.createEvent);

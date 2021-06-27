@@ -462,7 +462,8 @@ export const getEventProfile = async (req, res) => {
       .where('event_id', event.id)
       .first();
     await trx('event_interactions')
-      .update({ count: (eventInteractions.count + 1) });
+      .update({ count: (eventInteractions.count + 1) })
+      .where('event_id', event.id);
 
     let progress = 0;
 
@@ -520,13 +521,15 @@ export const searchEvents = async (req, res) => {
     const eventQuery = DB('events as e')
       .select(
         'e.id', 'e.title', 'e.main_organizer_id as mainOrganizer', 'ern.id as ernId',
-        'e.image',
+        'e.image', 'ei.count as interactions',
       )
       .join('event_resources_needed as ern', 'ern.event_id', 'e.id')
       .leftJoin('event_categories as ec', 'ec.event_id', 'e.id')
+      .leftJoin('event_interactions as ei', 'ei.event_id', 'e.id')
       .where('e.is_active', true)
       .where('e.is_complete', false)
-      .groupBy('e.id');
+      .groupBy('e.id')
+      .orderBy('interactions', 'asc');
 
     // Gets events based on categories user has followed
     if (categoriesFollowed.length > 0 && personalized) {

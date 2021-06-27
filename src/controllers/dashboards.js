@@ -8,6 +8,10 @@ export const getDashboardData = async (req, res) => {
   const { isSuperAdmin, organization, user } = tokenData;
   // console.log({ isSuperAdmin, organization, tokenData });
   const isOrganization = !!(organization && organization.id);
+  const u = await DB('users', 'image')
+    .select('name')
+    .where('id', user.id)
+    .first();
   try {
     let superAdminData = null;
     if (isSuperAdmin) {
@@ -35,6 +39,12 @@ export const getDashboardData = async (req, res) => {
       const events = await DB('events')
         .count('id as count')
         .first();
+      const resources = await DB('resources')
+        .count('id as count')
+        .first();
+      const categories = await DB('categories')
+        .count('id as count')
+        .first();
       superAdminData = {
         individuals: individuals.count,
         approvals: approvals.count,
@@ -42,6 +52,8 @@ export const getDashboardData = async (req, res) => {
         volunteerOrganizations: volunteerOrganizations.count,
         beneficiaries: beneficiaries.count,
         events: events.count,
+        resources: resources.count,
+        categories: categories.count,
       };
     }
     // YOUR ACTIVITIES
@@ -70,8 +82,8 @@ export const getDashboardData = async (req, res) => {
         .where(function () {
           this.where('e.main_organizer_id', tokenData.organization.id).orWhere('eo.organization_id', tokenData.organization.id);
         });
-        // .where('e.main_organizer_id', tokenData.organization.id)
-        // .orWhere('eo.organization_id', tokenData.organization.id);
+      // .where('e.main_organizer_id', tokenData.organization.id)
+      // .orWhere('eo.organization_id', tokenData.organization.id);
       // const X = await DB('events as e')
       //   .leftJoin('organizations as o', 'o.id', 'e.main_organizer_id')
       //   .leftJoin('event_organizers as eo', 'eo.event_id', 'e.id')
@@ -193,6 +205,11 @@ export const getDashboardData = async (req, res) => {
     }
 
     const responseObj = {
+      user: {
+        id: user.id,
+        name: u.name,
+        image: u.image,
+      },
       superAdmin: superAdminData,
       yourActivities,
       yourOrganization,
@@ -221,6 +238,28 @@ export const getIndividuals = async (req, res) => {
       .select('name', 'email', 'contact_number as phone', 'description')
       .where('user_role_id', 2);
     return res.status(200).send(individuals);
+  } catch (err) {
+    console.log(err);
+    return res.status(500).send('Something went wrong');
+  }
+};
+
+export const getResources = async (req, res) => {
+  try {
+    const resources = await DB('resources')
+      .select('name', 'id');
+    return res.status(200).send(resources);
+  } catch (err) {
+    console.log(err);
+    return res.status(500).send('Something went wrong');
+  }
+};
+
+export const getCategories = async (req, res) => {
+  try {
+    const categories = await DB('categories')
+      .select('name', 'id');
+    return res.status(200).send(categories);
   } catch (err) {
     console.log(err);
     return res.status(500).send('Something went wrong');
@@ -273,6 +312,7 @@ export const getEvents = async (req, res) => {
         'e.is_active as isActive',
         'e.is_complete as isComplete',
         'u.name as mainOrganizer',
+        'e.main_organizer_id as mainOrganizerId',
       )
       .groupBy('e.id');
 
@@ -289,6 +329,7 @@ export const getEvents = async (req, res) => {
         .count('id as count')
         .where('event_id', event.id)
         .first();
+      // TODO
       console.log({ pledgesCount });
     }
     /*
