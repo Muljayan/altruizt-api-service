@@ -4,13 +4,6 @@ const DATABASE = process.env.DB_NAME;
 const PASSWORD = process.env.DB_PW;
 const USER = process.env.DB_USER;
 
-console.log({
-  DATABASE,
-  PASSWORD,
-  USER,
-  env: process.env,
-});
-
 const DB = knex({
   client: 'mysql2',
   connection: {
