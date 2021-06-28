@@ -8,6 +8,7 @@ console.log({
   DATABASE,
   PASSWORD,
   USER,
+  env: process.env,
 });
 
 const DB = knex({
