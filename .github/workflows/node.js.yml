@@ -27,12 +27,12 @@ jobs:
     - run: npm -v
     - run: node -v
     - run: npm install
-    - run: PORT=$PORT DB_NAME=$DB_NAME DB_HOST=$DB_HOST DB_PW=$DB_PW JWT_SECRET=$JWT_SECRET USER_IMAGE_DIRECTORY=$USER_IMAGE_DIRECTORY EVENT_IMAGE_DIRECTORY=$EVENT_IMAGE_DIRECTORY ASSETS_DIRECTORY=$ASSETS_DIRECTORY pm2 restart AltruiztAPI --update-env
+    - run: PORT=$PORT DB_NAME=$DB_NAME DB_USER=$DB_USER DB_PW=$DB_PW JWT_SECRET=$JWT_SECRET USER_IMAGE_DIRECTORY=$USER_IMAGE_DIRECTORY EVENT_IMAGE_DIRECTORY=$EVENT_IMAGE_DIRECTORY ASSETS_DIRECTORY=$ASSETS_DIRECTORY pm2 restart AltruiztAPI --update-env
       env:
         PORT: ${{ secrets.PORT }}
         DB_NAME: ${{ secrets.DB_NAME }}
         DB_PW: ${{ secrets.DB_PW }}
-        DB_HOST: ${{ secrets.DB_HOST }}
+        DB_USER: ${{ secrets.DB_USER }}
         JWT_SECRET: ${{ secrets.JWT_SECRET }}
         USER_IMAGE_DIRECTORY: ${{ secrets.USER_IMAGE_DIRECTORY }}
         EVENT_IMAGE_DIRECTORY: ${{ secrets.EVENT_IMAGE_DIRECTORY }}
