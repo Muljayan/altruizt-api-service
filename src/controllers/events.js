@@ -162,11 +162,11 @@ export const updateEventProfile = async (req, res) => {
       trx.rollback();
       return res.status(401).send({ message: 'Your cannot update this event!' });
     }
-    const checkIfMainOrganizer = await DB('events as e')
+    const checkIfMainOrganizer = await trx('events as e')
       .where('e.id', id)
       .where('e.main_organizer_id', organization.id)
       .first();
-    const checkIfCollaborator = await DB('events as e')
+    const checkIfCollaborator = await trx('events as e')
       .leftJoin('event_organizers as eo', 'eo.event_id', 'e.id')
       .where('e.id', id)
       .where('eo.organization_id', organization.id)
@@ -658,30 +658,29 @@ export const searchEventsFollowed = async (req, res) => {
 export const getEventPledges = async (req, res) => {
   const { id } = req.params;
   const tokenData = extractToken(req);
-  const { user } = tokenData;
+  const { organization } = tokenData;
+
   try {
-    // Check if the user is the event organizer
-    const event = await DB('events')
-      .select('main_organizer_id as mainOrganizerId')
-      .where('id', id);
-    if (event.mainOrganizerId !== user.id) {
-      const eventOrganizers = await DB('events as e')
-        .select('eo.organization_id as id')
-        .join('event_organizers as eo', 'eo.event_id', 'e.id')
-        .where('e.id', id);
+    const checkIfMainOrganizer = await DB('events as e')
+      .where('e.id', id)
+      .where('e.main_organizer_id', organization.id)
+      .first();
+    const checkIfCollaborator = await DB('events as e')
+      .leftJoin('event_organizers as eo', 'eo.event_id', 'e.id')
+      .where('e.id', id)
+      .where('eo.organization_id', organization.id)
+      .first();
 
-      let isAOrganizer = false;
-
-      for await (const organizer of eventOrganizers) {
-        if (organizer.id === user.id) {
-          isAOrganizer = true;
-        }
-      }
-      if (!isAOrganizer) {
-        return res.status(404).send('Not an organizer');
-      }
+    if (!(checkIfMainOrganizer || checkIfCollaborator)) {
+      return res.status(401).send({ message: 'Your cannot get pledges for this event!' });
     }
-    return res.status(200).send({ message: 'success' });
+    const pledges = await DB('event_pledges as ep')
+      .leftJoin('users as u', 'u.id', 'ep.user_id ')
+      .where('ep.event_id', id)
+      .select('ep.id as id', 'u.name as name', 'ep.contact_number as phone', 'contact_email as email');
+    console.log(pledges);
+
+    return res.status(200).send(pledges);
   } catch (err) {
     console.log(err);
     return res.status(500).send('Something went wrong');
@@ -792,6 +791,7 @@ export const downvote = async (req, res) => {
 export const toggleEventPledge = async (req, res) => {
   try {
     const { id } = req.params;
+    const { email, phone } = req.body;
     const tokenData = extractToken(req);
     const { user } = tokenData;
     const pledge = await DB('event_pledges')
@@ -806,7 +806,12 @@ export const toggleEventPledge = async (req, res) => {
         .delete();
     } else {
       // add
-      const pledgeData = { user_id: user.id, event_id: id };
+      const pledgeData = {
+        user_id: user.id,
+        event_id: id,
+        contact_number: phone || null,
+        contact_email: email || null,
+      };
       await DB('event_pledges')
         .insert(pledgeData);
     }

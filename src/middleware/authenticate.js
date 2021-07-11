@@ -19,7 +19,8 @@ const validateToken = (res, token) => {
       message: 'Invalid token, authorization denied',
       type: 'INVALID_TOKEN',
     };
-    return res.status(401).send(errors);
+    res.status(401).send(errors);
+    return null;
   }
 };
 

@@ -1,4 +1,5 @@
 import { promises as fs } from 'fs';
+import bcrypt from 'bcryptjs';
 
 import DB from '../config/database';
 import { USER_IMAGE_DIRECTORY } from '../config/directories';
@@ -107,7 +108,7 @@ export const editProfile = async (req, res) => {
 
     if (!name || !email) {
       trx.rollback();
-      return res.status(400).send({ message: 'Name, password and/or email is missing!' });
+      return res.status(400).send({ message: 'Name and/or email is missing!' });
     }
 
     // It is compulsory for organizations to include the address and phone number
@@ -150,7 +151,9 @@ export const editProfile = async (req, res) => {
     };
 
     if (password) {
-      userData.password = password;
+      const salt = bcrypt.genSaltSync(10);
+      const hashedPassword = bcrypt.hashSync(password, salt);
+      userData.password = hashedPassword;
     }
 
     await trx('users')

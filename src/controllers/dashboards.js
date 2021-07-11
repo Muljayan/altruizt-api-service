@@ -82,6 +82,7 @@ export const getDashboardData = async (req, res) => {
         .where(function () {
           this.where('e.main_organizer_id', tokenData.organization.id).orWhere('eo.organization_id', tokenData.organization.id);
         });
+
       // .where('e.main_organizer_id', tokenData.organization.id)
       // .orWhere('eo.organization_id', tokenData.organization.id);
       // const X = await DB('events as e')
@@ -318,9 +319,10 @@ export const getEvents = async (req, res) => {
 
     if (tokenData && tokenData.organization) {
       eventQuery
-        .join('event_organizers as eo', 'eo.event_id', 'e.id')
-        .where('o.id', tokenData.organization.id)
-        .orWhere('eo.organization_id', tokenData.organization.id);
+        .leftJoin('event_organizers as eo', 'eo.event_id', 'e.id')
+        .where(function () {
+          this.where('e.main_organizer_id', tokenData.organization.id).orWhere('eo.organization_id', tokenData.organization.id);
+        });
     }
 
     const events = await eventQuery;
