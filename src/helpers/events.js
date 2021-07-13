@@ -1,3 +1,22 @@
+export const getEventProgress = async (DB, id) => {
+  const eventResourcesProgress = await DB('resources as r')
+    .select('r.name as name', 'r.unit as unit', 'ern.resource_id as id', 'ern.quantity as neededQuantity', 'err.quantity as receivedQuantity')
+    .join('event_resources_needed as ern', 'r.id', 'ern.resource_id')
+    .leftJoin('event_resources_received as err', 'r.id', 'err.resource_id')
+    .where('ern.event_id', id)
+    .where('err.event_id', id)
+    .groupBy('r.id');
+  let progress = 0;
+  if (eventResourcesProgress) {
+    for await (const resource of eventResourcesProgress) {
+      const calculatedValue = resource.receivedQuantity / resource.neededQuantity;
+      progress += (calculatedValue > 1 ? 1 : calculatedValue);
+    }
+    progress = (progress * 100) / eventResourcesProgress.length;
+  }
+  return { progress, eventResourcesProgress };
+};
+
 export const getEventsPreviewData = async (event, DB) => {
   const mainOrganizer = await DB('organizations as o')
     .join('users as u', 'u.id', 'o.user_id')
@@ -22,22 +41,7 @@ export const getEventsPreviewData = async (event, DB) => {
     .join('users as u', 'u.id', 'o.user_id')
     .where('eo.event_id', event.id);
 
-  const eventResourcesProgress = await DB('resources as r')
-    .select('r.name as name', 'r.unit as unit', 'ern.resource_id as id', 'ern.quantity as neededQuantity', 'err.quantity as receivedQuantity')
-    .join('event_resources_needed as ern', 'r.id', 'ern.resource_id')
-    .leftJoin('event_resources_received as err', 'r.id', 'err.resource_id')
-    .where('ern.event_id', event.id)
-    .where('err.event_id', event.id)
-    .groupBy('r.id');
-  let progress = 0;
-
-  if (eventResourcesProgress) {
-    for await (const resource of eventResourcesProgress) {
-      const calculatedValue = resource.receivedQuantity / resource.neededQuantity;
-      progress += (calculatedValue > 1 ? 1 : calculatedValue);
-    }
-    progress = (progress * 100) / eventResourcesProgress.length;
-  }
+  const { progress } = await getEventProgress(DB, event.id);
 
   return {
     ...event,
@@ -50,31 +54,7 @@ export const getEventsPreviewData = async (event, DB) => {
   // responseData.push();
 };
 
-// export const getRecommendedOrganizations = async (id, DB) => {
-//   const organization = await DB('organizations as o')
-//     .select('organization_type_id as organizationType')
-//     .where('o.id', id)
-//     .first();
-
-//   const resourcesAvailable = [];
-//   const resourcesNeeded = [];
-
-//   // beneficieries
-//   if (organization.type === 3) {
-//     resources = await DB('resources_available as ra')
-//       .select('r.name as name', 'r.unit as unit', 'ra.quantity as quantity')
-//       .join('resources as r', 'r.id', 'ra.resource_id')
-//       .where('ra.organization_id', o.id);
-//   } else {
-//     // Corporates and Volunteer organizations
-//     resources = await DB('resources_needed as rn')
-//       .select('r.name as name', 'r.unit as unit', 'rn.quantity as quantity')
-//       .join('resources as r', 'r.id', 'rn.resource_id')
-//       .where('rn.organization_id', id);
-//   }
-
-// };
-
 export default {
   getEventsPreviewData,
+  getEventProgress,
 };

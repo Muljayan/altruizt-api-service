@@ -3,7 +3,7 @@ import { promises as fs } from 'fs';
 import DB from '../config/database';
 
 import extractToken from '../utils/extractToken';
-import { getEventsPreviewData } from '../helpers/events';
+import { getEventProgress, getEventsPreviewData } from '../helpers/events';
 import { imageExtractor } from '../utils/extractors';
 import { EVENT_IMAGE_DIRECTORY } from '../config/directories';
 
@@ -157,22 +157,13 @@ export const updateEventProfile = async (req, res) => {
   try {
     const tokenData = extractToken(req);
     const { organization } = tokenData;
-    // TODO move this to middleware
-    if (!organization) {
-      trx.rollback();
-      return res.status(401).send({ message: 'Your cannot update this event!' });
-    }
-    const checkIfMainOrganizer = await trx('events as e')
+    const completionEligibility = await trx('events as e')
       .where('e.id', id)
       .where('e.main_organizer_id', organization.id)
-      .first();
-    const checkIfCollaborator = await trx('events as e')
-      .leftJoin('event_organizers as eo', 'eo.event_id', 'e.id')
-      .where('e.id', id)
-      .where('eo.organization_id', organization.id)
+      .select('e.is_complete as isComplete')
       .first();
 
-    if (!(checkIfMainOrganizer || checkIfCollaborator)) {
+    if (!completionEligibility || completionEligibility.isComplete) {
       trx.rollback();
       return res.status(401).send({ message: 'Your cannot update this event!' });
     }
@@ -344,6 +335,161 @@ export const updateEventProfile = async (req, res) => {
   }
 };
 
+// router.get('/profile/:id/closure'
+export const getClosingData = async (req, res) => {
+  const { id } = req.params;
+  try {
+    const tokenData = extractToken(req);
+    const { organization } = tokenData;
+
+    const checkIfMainOrganizer = await DB('events as e')
+      .where('e.id', id)
+      .where('e.main_organizer_id', organization.id)
+      .first();
+
+    if (!checkIfMainOrganizer) {
+      return res.status(401).send({ message: 'Your cannot update this event!' });
+    }
+
+    const mainOrganization = await DB('users as u')
+      .leftJoin('organizations as o', 'o.user_id', 'u.id')
+      .select('o.id as value', 'u.name as label')
+      .where('o.id', organization.id)
+      .first();
+
+    const collaborators = await DB('event_organizers as eo')
+      .leftJoin('organizations as o', 'o.id', 'eo.organization_id')
+      .leftJoin('users as u', 'u.id', 'o.user_id')
+      .select('o.id as value', 'u.name as label')
+      .where('eo.event_id', id);
+
+    const organizers = [mainOrganization, ...collaborators];
+
+    const resources = await DB('resources as r')
+      .select(
+        'r.id as id',
+        'r.name as name',
+        'err.quantity as quantityReceived',
+        'ern.quantity as quantityNeeded',
+        DB.raw('(err.quantity - ern.quantity) as quantityDifference'),
+      )
+      .leftJoin('event_resources_needed as ern', 'ern.resource_id', 'r.id')
+      .leftJoin('event_resources_received as err', 'err.resource_id', 'r.id')
+      .where('ern.event_id', id)
+      .where('err.event_id', id)
+      .orderBy('r.id');
+
+    const { progress } = await getEventProgress(DB, id);
+    const remainingResources = [];
+    if (resources && resources.length > 0) {
+      for await (const resource of resources) {
+        if (resource.quantityDifference > 0) {
+          remainingResources.push(resource);
+        }
+      }
+    }
+
+    const responseObject = {
+      organizers,
+      resources,
+      progress,
+      remainingResources,
+    };
+    return res.status(201).send(responseObject);
+  } catch (err) {
+    console.log(err);
+    return res.status(400).send('Invalid user inputs');
+  }
+};
+
+// post('/profile/:id/complete'
+export const completeEvent = async (req, res) => {
+  const { id } = req.params;
+  const trx = await DB.transaction();
+  const {
+    transferToOrganization, closingNote, remainingResources, progress,
+  } = req.body;
+  try {
+    const tokenData = extractToken(req);
+    const { organization } = tokenData;
+    const completionEligibility = await trx('events as e')
+      .where('e.id', id)
+      .where('e.main_organizer_id', organization.id)
+      .select('e.is_complete as isComplete')
+      .first();
+
+    if (!completionEligibility || completionEligibility.isComplete) {
+      trx.rollback();
+      return res.status(401).send({ message: 'Your cannot update this event!' });
+    }
+    const transferOrganization = await trx('organizations as o')
+      .leftJoin('users as u', 'u.id', 'o.user_id')
+      .select('u.name as name', 'o.id as id', 'o.organization_type_id as organizationType')
+      .where('o.id', transferToOrganization)
+      .first();
+
+    // Update event
+    await trx('events')
+      .where('id', id)
+      .update({
+        is_successful: !!(progress >= 100),
+        is_complete: true,
+      });
+
+    if (remainingResources.length > 0 && transferToOrganization) {
+      // Beneficiery
+      if (transferOrganization.organizationType === 3) {
+        // gets added as a log and taken by beneficiery
+        const transferlogData = {
+          event_id: id,
+          entry: `Remaining tems sent to ${transferOrganization.name}`,
+          date: new Date(),
+        };
+        await trx('event_logs')
+          .insert(transferlogData);
+      } else {
+        // gets added to resources available pool
+        for await (const resource of remainingResources) {
+          const resourceAvailability = await trx('resources_available')
+            .where('organization_id', transferOrganization.id)
+            .where('resource_id', resource.id)
+            .select('quantity', 'id')
+            .first();
+          if (resourceAvailability) {
+            await trx('resources_available')
+              .update({ quantity: resourceAvailability.quantity + resource.quantityDifference })
+              .where('id', resourceAvailability.id);
+          } else {
+            await trx('resources_available')
+              .insert({
+                quantity: resource.quantityDifference,
+                organization_id: transferOrganization.id,
+                resource_id: resource.id,
+              });
+          }
+        }
+      }
+    }
+
+    // Add closing note
+    if (closingNote) {
+      const eventLogData = {
+        event_id: id,
+        entry: closingNote,
+        date: new Date(),
+      };
+      await trx('event_logs')
+        .insert(eventLogData);
+    }
+    trx.commit();
+    return res.status(200).send({ message: 'Success' });
+  } catch (err) {
+    console.log(err);
+    trx.rollback();
+    return res.status(500).send('Something went wrong!');
+  }
+};
+
 // router.get('/profile/:id', async (req, res) => {
 export const getEventProfile = async (req, res) => {
   const { id } = req.params;
@@ -360,7 +506,7 @@ export const getEventProfile = async (req, res) => {
     const event = await trx('events')
       .select('id', 'is_active as isActive', 'title', 'description', 'start_date as startDate', 'end_date as endDate', 'location',
         'contact_name as contactName', 'phone', 'bank_account_name as bankName', 'bank_account_number as bankNumber', 'bank_account_branch as bankBranch',
-        'image',
+        'image', 'is_complete as isComplete',
         'main_organizer_id as mainOrganizer')
       .where('id', id)
       .first();
@@ -389,13 +535,6 @@ export const getEventProfile = async (req, res) => {
     const eventResourcesReceived = await trx('event_resources_received as err')
       .select('r.name as name', 'r.unit as unit', 'err.resource_id as id', 'err.quantity as quantity')
       .join('resources as r', 'r.id', 'err.resource_id')
-      .where('err.event_id', id);
-
-    const eventResourcesProgress = await trx('resources as r')
-      .select('r.name as name', 'r.unit as unit', 'ern.resource_id as id', 'ern.quantity as neededQuantity', 'err.quantity as receivedQuantity')
-      .leftJoin('event_resources_needed as ern', 'r.id', 'ern.resource_id')
-      .leftJoin('event_resources_received as err', 'r.id', 'err.resource_id')
-      .where('ern.event_id', id)
       .where('err.event_id', id);
 
     const eventLogs = await trx('event_logs')
@@ -465,15 +604,7 @@ export const getEventProfile = async (req, res) => {
       .update({ count: (eventInteractions.count + 1) })
       .where('event_id', event.id);
 
-    let progress = 0;
-
-    if (eventResourcesProgress) {
-      for await (const resource of eventResourcesProgress) {
-        const calculatedValue = resource.receivedQuantity / resource.neededQuantity;
-        progress += (calculatedValue > 1 ? 1 : calculatedValue);
-      }
-      progress = (progress * 100) / eventResourcesProgress.length;
-    }
+    const { progress, eventResourcesProgress } = await getEventProgress(trx, id);
 
     const responseData = {
       ...event,
@@ -521,13 +652,13 @@ export const searchEvents = async (req, res) => {
     const eventQuery = DB('events as e')
       .select(
         'e.id', 'e.title', 'e.main_organizer_id as mainOrganizer', 'ern.id as ernId',
-        'e.image', 'ei.count as interactions',
+        'e.image as image', 'ei.count as interactions', 'e.is_complete as isComplete',
       )
       .join('event_resources_needed as ern', 'ern.event_id', 'e.id')
       .leftJoin('event_categories as ec', 'ec.event_id', 'e.id')
       .leftJoin('event_interactions as ei', 'ei.event_id', 'e.id')
       .where('e.is_active', true)
-      .where('e.is_complete', false)
+      // .where('e.is_complete', false)
       .groupBy('e.id')
       .orderBy('interactions', 'asc');
 
@@ -572,13 +703,14 @@ export const searchEventsFollowed = async (req, res) => {
     const eventQuery = DB('events as e')
       .select(
         'e.id', 'e.title', 'e.main_organizer_id as mainOrganizer', 'ern.id as ernId',
+        'e.is_complete as isComplete', 'e.image as image',
       )
       .join('event_resources_needed as ern', 'ern.event_id', 'e.id')
       .join('event_followers as ef', 'ef.event_id', 'e.id')
       .leftJoin('event_categories as ec', 'ec.event_id', 'e.id')
       .where('e.is_active', true)
       .where('ef.user_id', user.id)
-      .where('e.is_complete', false)
+      // .where('e.is_complete', false)
       .groupBy('e.id');
 
     // Gets events based on resources searched
@@ -665,20 +797,14 @@ export const getEventPledges = async (req, res) => {
       .where('e.id', id)
       .where('e.main_organizer_id', organization.id)
       .first();
-    const checkIfCollaborator = await DB('events as e')
-      .leftJoin('event_organizers as eo', 'eo.event_id', 'e.id')
-      .where('e.id', id)
-      .where('eo.organization_id', organization.id)
-      .first();
 
-    if (!(checkIfMainOrganizer || checkIfCollaborator)) {
+    if (!checkIfMainOrganizer) {
       return res.status(401).send({ message: 'Your cannot get pledges for this event!' });
     }
     const pledges = await DB('event_pledges as ep')
       .leftJoin('users as u', 'u.id', 'ep.user_id ')
       .where('ep.event_id', id)
       .select('ep.id as id', 'u.name as name', 'ep.contact_number as phone', 'contact_email as email');
-    console.log(pledges);
 
     return res.status(200).send(pledges);
   } catch (err) {
@@ -858,19 +984,30 @@ export const toggleEventRating = async (req, res) => {
 
 // router.put('/profile/:id/toggle-activation-status', );
 export const toggleActivationStatus = async (req, res) => {
-  // TODO logic to avoid activation if deactivated by superadmin
-  // const tokenData = extractToken(req);
+  const tokenData = extractToken(req);
   try {
     const { id } = req.params;
 
-    const organization = await DB('events')
-      .select('is_active as isActivated')
+    const event = await DB('events')
+      .select('is_active as isActivated', 'superadmin_deactivation as superadminDeactivation')
       .where('id', id)
       .first();
 
-    await DB('events')
-      .update({ is_active: !organization.isActivated })
-      .where('id', id);
+    if (!tokenData.isSuperAdmin && event.superadminDeactivation) {
+      return res.status(401).send({ message: 'The superadmin has deactivated your activation permission' });
+    }
+
+    if (tokenData.isSuperAdmin && event.isActivated) {
+      // Super admin will deactivate
+      await DB('events')
+        .update({ is_active: false, superadmin_deactivation: true })
+        .where('id', id);
+    } else {
+      await DB('events')
+        .update({ is_active: !event.isActivated, superadmin_deactivation: false })
+        .where('id', id);
+    }
+
     return res.status(200).send();
   } catch (err) {
     console.log(err);

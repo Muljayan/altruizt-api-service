@@ -112,9 +112,10 @@ export const getOrganizationProfile = async (req, res) => {
     const eventQuery = DB('events as e')
       .select(
         'e.id', 'e.title', 'e.main_organizer_id as mainOrganizer',
+        'e.is_complete as isComplete',
       )
       .where('e.is_active', true)
-      .where('e.is_complete', false)
+      // .where('e.is_complete', false)
       .groupBy('e.id');
 
     const pastEventQuery = DB('events as e')

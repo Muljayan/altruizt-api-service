@@ -80,7 +80,6 @@ export const moderator = (req, res, next) => {
 export const superadmin = (req, res, next) => {
   const token = req.headers['x-auth-token'];
   const decodedToken = validateToken(res, token);
-
   try {
     if (decodedToken && (!decodedToken.isSuperAdmin)) {
       throw new Error('Not an organization or superadmin');

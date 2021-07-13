@@ -6,7 +6,6 @@ export const getDashboardData = async (req, res) => {
   const tokenData = extractToken(req);
 
   const { isSuperAdmin, organization, user } = tokenData;
-  // console.log({ isSuperAdmin, organization, tokenData });
   const isOrganization = !!(organization && organization.id);
   const u = await DB('users', 'image')
     .select('name')
@@ -97,7 +96,6 @@ export const getDashboardData = async (req, res) => {
       //   .groupBy(['e.id', 'er.event_id'])
       //   .where('o.id', tokenData.organization.id)
       //   .orWhere('eo.organization_id', tokenData.organization.id);
-      // console.log({ X });
 
       let totalEvents = 0;
       let completedEvents = 0;
@@ -305,12 +303,15 @@ export const getEvents = async (req, res) => {
   const tokenData = extractToken(req);
   try {
     const eventQuery = DB('events as e')
-      .join('organizations as o', 'o.id', 'e.main_organizer_id')
-      .join('users as u', 'u.id', 'o.user_id')
+      .leftJoin('organizations as o', 'o.id', 'e.main_organizer_id')
+      .leftJoin('users as u', 'u.id', 'o.user_id')
+      .leftJoin('event_pledges as ep', 'ep.event_id', 'e.id')
+      .count('ep.id as pledges')
       .select(
         'e.id as id',
         'e.title as title',
         'e.is_active as isActive',
+        'e.superadmin_deactivation as superadminDeactivation',
         'e.is_complete as isComplete',
         'u.name as mainOrganizer',
         'e.main_organizer_id as mainOrganizerId',
@@ -326,14 +327,6 @@ export const getEvents = async (req, res) => {
     }
 
     const events = await eventQuery;
-    for await (const event of events) {
-      const pledgesCount = await DB('event_pledges')
-        .count('id as count')
-        .where('event_id', event.id)
-        .first();
-      // TODO
-      console.log({ pledgesCount });
-    }
     /*
     Name
     Main Organizer => Link to organizer

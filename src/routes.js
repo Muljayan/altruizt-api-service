@@ -31,6 +31,8 @@ router.post('/events/', eventsController.searchEvents);
 router.post('/events/create', authenticate.organization, eventsController.createEvent);
 router.get('/events/profile/:id', eventsController.getEventProfile);
 router.put('/events/profile/:id/update', authenticate.organization, eventsController.updateEventProfile);
+router.get('/events/profile/:id/closure', authenticate.organization, eventsController.getClosingData);
+router.post('/events/profile/:id/complete', authenticate.organization, eventsController.completeEvent);
 router.get('/events/profile/:id/pledges', authenticate.organization, eventsController.getEventPledges);
 router.post('/events/followings', authenticate.all, eventsController.searchEventsFollowed);
 router.put('/events/profile/:id/pledge', authenticate.all, eventsController.toggleEventPledge);
