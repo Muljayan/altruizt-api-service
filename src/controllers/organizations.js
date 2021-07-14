@@ -1,6 +1,7 @@
 import DB from '../config/database';
 import { getEventsPreviewData } from '../helpers/events';
 import { getOrganizationActivationStatus } from '../helpers/organizations';
+import sendEmail from '../utils/email';
 import extractToken from '../utils/extractToken';
 
 // router.post('/', async (req, res) => {
@@ -72,7 +73,7 @@ export const searchOrganizations = async (req, res) => {
     return res.status(200).send(responseData);
   } catch (err) {
     console.log(err);
-    return res.status(500).send('Something went wrong');
+    return res.status(500).send({ message: 'Something went wrong' });
   }
 };
 
@@ -102,7 +103,7 @@ export const getOrganizationProfile = async (req, res) => {
     const organization = await organizationQuery;
 
     if (!organization) {
-      return res.status(404).send('Not found');
+      return res.status(404).send({ message: 'Not found' });
     }
 
     let resources = [];
@@ -179,7 +180,7 @@ export const getOrganizationProfile = async (req, res) => {
     return res.status(200).send(responseData);
   } catch (err) {
     console.log(err);
-    return res.status(500).send('Something went wrong');
+    return res.status(500).send({ message: 'Something went wrong' });
   }
 };
 
@@ -188,19 +189,25 @@ export const toggleActivationStatus = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const organization = await DB('organizations')
-      .select('is_activated as isActivated')
-      .where('id', id)
+    const organization = await DB('organizations as o')
+      .leftJoin('users as u', 'u.id', 'o.user_id')
+      .select('o.is_activated as isActivated', 'u.email as email')
+      .where('o.id', id)
       .first();
 
     await DB('organizations')
       .update({ is_activated: !organization.isActivated })
       .where('id', id);
     const responseData = await getOrganizationActivationStatus(DB);
+    if (!organization.isActivated) {
+      await sendEmail(organization.email, 'Your Organization is activated', 'Your Organization is activated');
+    } else {
+      await sendEmail(organization.email, 'Your Organization is deactivated', 'Your Organization is deactivated');
+    }
     return res.status(200).send(responseData);
   } catch (err) {
     console.log(err);
-    return res.status(500).send('Something went wrong');
+    return res.status(500).send({ message: 'Something went wrong' });
   }
 };
 
@@ -210,7 +217,7 @@ export const getIndividuals = async (req, res) => {
     return res.status(500).send(responseObj);
   } catch (err) {
     console.log(err);
-    return res.status(500).send('Something went wrong');
+    return res.status(500).send({ message: 'Something went wrong' });
   }
 };
 
@@ -220,7 +227,7 @@ export const getCorporates = async (req, res) => {
     return res.status(500).send(responseObj);
   } catch (err) {
     console.log(err);
-    return res.status(500).send('Something went wrong');
+    return res.status(500).send({ message: 'Something went wrong' });
   }
 };
 
@@ -230,7 +237,7 @@ export const getVolunteerOrganizations = async (req, res) => {
     return res.status(500).send(responseObj);
   } catch (err) {
     console.log(err);
-    return res.status(500).send('Something went wrong');
+    return res.status(500).send({ message: 'Something went wrong' });
   }
 };
 
@@ -240,7 +247,7 @@ export const getBeneficiaries = async (req, res) => {
     return res.status(500).send(responseObj);
   } catch (err) {
     console.log(err);
-    return res.status(500).send('Something went wrong');
+    return res.status(500).send({ message: 'Something went wrong' });
   }
 };
 
@@ -250,6 +257,6 @@ export const getEvents = async (req, res) => {
     return res.status(500).send(responseObj);
   } catch (err) {
     console.log(err);
-    return res.status(500).send('Something went wrong');
+    return res.status(500).send({ message: 'Something went wrong' });
   }
 };

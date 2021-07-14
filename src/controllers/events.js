@@ -6,6 +6,8 @@ import extractToken from '../utils/extractToken';
 import { getEventProgress, getEventsPreviewData } from '../helpers/events';
 import { imageExtractor } from '../utils/extractors';
 import { EVENT_IMAGE_DIRECTORY } from '../config/directories';
+import { FLAG_LIMIT } from '../config/settings';
+import sendEmail from '../utils/email';
 
 // router.post('/create', async (req, res) => {
 export const createEvent = async (req, res) => {
@@ -13,11 +15,6 @@ export const createEvent = async (req, res) => {
   try {
     const tokenData = extractToken(req);
     const { organization } = tokenData;
-    // TODO move this to middleware
-    if (!organization) {
-      trx.rollback();
-      return res.status(401).send({ message: 'Your cannot create events!' });
-    }
 
     const {
       title,
@@ -39,11 +36,11 @@ export const createEvent = async (req, res) => {
 
     if (resources.length < 1) {
       trx.rollback();
-      return res.status(400).send('Resources needed not added');
+      return res.status(400).send({ message: 'Resources needed not added' });
     }
     if (beneficiaries.length < 1) {
       trx.rollback();
-      return res.status(400).send('Beneficiaries not added');
+      return res.status(400).send({ message: 'Beneficiaries not added' });
     }
 
     const data = {
@@ -146,7 +143,7 @@ export const createEvent = async (req, res) => {
   } catch (err) {
     trx.rollback();
     console.log(err);
-    return res.status(400).send('Invalid user inputs');
+    return res.status(400).send({ message: 'Invalid user inputs' });
   }
 };
 
@@ -190,11 +187,11 @@ export const updateEventProfile = async (req, res) => {
 
     if (resources.length < 1) {
       trx.rollback();
-      return res.status(400).send('Resources needed not added');
+      return res.status(400).send({ message: 'Resources needed not added' });
     }
     if (beneficiaries.length < 1) {
       trx.rollback();
-      return res.status(400).send('Beneficiaries not added');
+      return res.status(400).send({ message: 'Beneficiaries not added' });
     }
 
     const data = {
@@ -331,7 +328,7 @@ export const updateEventProfile = async (req, res) => {
   } catch (err) {
     trx.rollback();
     console.log(err);
-    return res.status(400).send('Invalid user inputs');
+    return res.status(400).send({ message: 'Invalid user inputs' });
   }
 };
 
@@ -398,7 +395,7 @@ export const getClosingData = async (req, res) => {
     return res.status(201).send(responseObject);
   } catch (err) {
     console.log(err);
-    return res.status(400).send('Invalid user inputs');
+    return res.status(400).send({ message: 'Invalid user inputs' });
   }
 };
 
@@ -486,7 +483,7 @@ export const completeEvent = async (req, res) => {
   } catch (err) {
     console.log(err);
     trx.rollback();
-    return res.status(500).send('Something went wrong!');
+    return res.status(500).send({ message: 'Something went wrong!' });
   }
 };
 
@@ -499,7 +496,7 @@ export const getEventProfile = async (req, res) => {
   try {
     if (!id) {
       trx.rollback();
-      return res.status(404).send('Event does not exist!');
+      return res.status(404).send({ message: 'Event does not exist!' });
     }
 
     // Find event
@@ -513,7 +510,7 @@ export const getEventProfile = async (req, res) => {
 
     if (!event) {
       trx.rollback();
-      return res.status(404).send('Event does not exist!');
+      return res.status(404).send({ message: 'Event does not exist!' });
     }
 
     const mainOrganizer = await trx('organizations as o')
@@ -627,7 +624,7 @@ export const getEventProfile = async (req, res) => {
   } catch (err) {
     trx.rollback();
     console.log(err);
-    return res.status(500).send('Something went wrong');
+    return res.status(500).send({ message: 'Something went wrong' });
   }
 };
 
@@ -688,7 +685,7 @@ export const searchEvents = async (req, res) => {
     return res.status(200).send(responseData);
   } catch (err) {
     console.log(err);
-    return res.status(500).send('Something went wrong');
+    return res.status(500).send({ message: 'Something went wrong' });
   }
 };
 
@@ -782,7 +779,7 @@ export const searchEventsFollowed = async (req, res) => {
     return res.status(200).send(responseData);
   } catch (err) {
     console.log(err);
-    return res.status(500).send('Something went wrong');
+    return res.status(500).send({ message: 'Something went wrong' });
   }
 };
 
@@ -809,7 +806,7 @@ export const getEventPledges = async (req, res) => {
     return res.status(200).send(pledges);
   } catch (err) {
     console.log(err);
-    return res.status(500).send('Something went wrong');
+    return res.status(500).send({ message: 'Something went wrong' });
   }
 };
 
@@ -838,7 +835,7 @@ export const toggleEventFollow = async (req, res) => {
     return res.status(200).send({ message: 'success' });
   } catch (err) {
     console.log(err);
-    return res.status(500).send('Something went wrong');
+    return res.status(500).send({ message: 'Something went wrong' });
   }
 };
 export const upvote = async (req, res) => {
@@ -873,7 +870,7 @@ export const upvote = async (req, res) => {
     return res.status(200).send({ message: 'success' });
   } catch (err) {
     console.log(err);
-    return res.status(500).send('Something went wrong');
+    return res.status(500).send({ message: 'Something went wrong' });
   }
 };
 
@@ -906,10 +903,32 @@ export const downvote = async (req, res) => {
       await DB('event_ratings')
         .insert(ratingData);
     }
+
+    const eventRatingScore = await DB('events as e')
+      .leftJoin('organizations as o', 'o.id', 'e.main_organizer_id')
+      .leftJoin('users as u', 'u.id', 'o.user_id')
+      .leftJoin('event_ratings as er', 'er.event_id', 'e.id')
+      .sum('er.value as value')
+      .select('e.id as id', 'u.email as email')
+      .where('e.id', id)
+      .groupBy('e.id')
+      .first();
+    if (Number(eventRatingScore.value) <= FLAG_LIMIT) {
+      const message = 'Event deactivated, flagged too many times. Contact the super admin!';
+      await DB('events')
+        .update({
+          is_active: false,
+          superadmin_deactivation: true,
+          deactivation_reason: message,
+        })
+        .where('id', id);
+      await sendEmail(eventRatingScore.email, `Your event #${id} has been flagged`, message);
+    }
+
     return res.status(200).send({ message: 'success' });
   } catch (err) {
     console.log(err);
-    return res.status(500).send('Something went wrong');
+    return res.status(500).send({ message: 'Something went wrong' });
   }
 };
 
@@ -944,7 +963,7 @@ export const toggleEventPledge = async (req, res) => {
     return res.status(200).send({ message: 'success' });
   } catch (err) {
     console.log(err);
-    return res.status(500).send('Something went wrong');
+    return res.status(500).send({ message: 'Something went wrong' });
   }
 };
 
@@ -978,7 +997,7 @@ export const toggleEventRating = async (req, res) => {
     return res.status(200).send({ message: 'success' });
   } catch (err) {
     console.log(err);
-    return res.status(500).send('Something went wrong');
+    return res.status(500).send({ message: 'Something went wrong' });
   }
 };
 
@@ -986,11 +1005,18 @@ export const toggleEventRating = async (req, res) => {
 export const toggleActivationStatus = async (req, res) => {
   const tokenData = extractToken(req);
   try {
+    const { reason } = req.body;
     const { id } = req.params;
 
-    const event = await DB('events')
-      .select('is_active as isActivated', 'superadmin_deactivation as superadminDeactivation')
-      .where('id', id)
+    const event = await DB('events as e')
+      .leftJoin('organizations as o', 'o.id', 'e.main_organizer_id')
+      .leftJoin('users as u', 'u.id', 'o.user_id')
+      .select(
+        'e.is_active as isActivated',
+        'e.superadmin_deactivation as superadminDeactivation',
+        'u.email as email',
+      )
+      .where('e.id', id)
       .first();
 
     if (!tokenData.isSuperAdmin && event.superadminDeactivation) {
@@ -1000,17 +1026,27 @@ export const toggleActivationStatus = async (req, res) => {
     if (tokenData.isSuperAdmin && event.isActivated) {
       // Super admin will deactivate
       await DB('events')
-        .update({ is_active: false, superadmin_deactivation: true })
+        .update({
+          is_active: false,
+          superadmin_deactivation: true,
+          deactivation_reason: reason,
+        })
         .where('id', id);
+      // TODO email
+      await sendEmail(event.email, `Your event #${id} has been deactivated`, reason);
     } else {
       await DB('events')
-        .update({ is_active: !event.isActivated, superadmin_deactivation: false })
+        .update({
+          is_active: !event.isActivated,
+          superadmin_deactivation: false,
+          deactivation_reason: !event.isActivated ? reason : '',
+        })
         .where('id', id);
     }
 
     return res.status(200).send();
   } catch (err) {
     console.log(err);
-    return res.status(500).send('Something went wrong');
+    return res.status(500).send({ message: 'Something went wrong' });
   }
 };

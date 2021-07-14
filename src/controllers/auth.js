@@ -4,6 +4,7 @@ import bcrypt from 'bcryptjs';
 import DB from '../config/database';
 import { JWT_SECRET } from '../config/secrets';
 import convertToSlug from '../utils/convertToSlug';
+import sendEmail from '../utils/email';
 
 /**
  * @route POST /auth/register
@@ -147,8 +148,12 @@ export const register = async (req, res) => {
       }
     }
 
+    const emailMessage = !isAnOrganization ? 'Congratulations! Your Altruizt account is created!' : 'Thank you for registering with Altruizt, your account is under review';
+
+    await sendEmail(email, 'Altruizt Account Creation', emailMessage);
+
     trx.commit();
-    return res.status(201).send('successfully added user');
+    return res.status(201).send({ message: 'successfully added user' });
   } catch (err) {
     trx.rollback();
     console.log(err);

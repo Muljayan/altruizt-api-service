@@ -1,5 +1,6 @@
 import DB from '../config/database';
 import { getOrganizationActivationStatus } from '../helpers/organizations';
+// import {  } from '../middleware/authenticate';
 import extractToken from '../utils/extractToken';
 
 export const getDashboardData = async (req, res) => {
@@ -82,21 +83,6 @@ export const getDashboardData = async (req, res) => {
           this.where('e.main_organizer_id', tokenData.organization.id).orWhere('eo.organization_id', tokenData.organization.id);
         });
 
-      // .where('e.main_organizer_id', tokenData.organization.id)
-      // .orWhere('eo.organization_id', tokenData.organization.id);
-      // const X = await DB('events as e')
-      //   .leftJoin('organizations as o', 'o.id', 'e.main_organizer_id')
-      //   .leftJoin('event_organizers as eo', 'eo.event_id', 'e.id')
-      //   .leftJoin('event_ratings as er', 'er.event_id', 'e.id')
-      //   .leftJoin('event_pledges as ep', 'ep.event_id', 'e.id')
-      //   .sum('er.value as ratings')
-      //   .count('ep.id as pledges')
-      //   .select('e.id as id', 'e.title as name', 'e.is_complete as isComplete',
-      //     'e.is_successful as isSuccessful')
-      //   .groupBy(['e.id', 'er.event_id'])
-      //   .where('o.id', tokenData.organization.id)
-      //   .orWhere('eo.organization_id', tokenData.organization.id);
-
       let totalEvents = 0;
       let completedEvents = 0;
       let successfulEvents = 0;
@@ -145,6 +131,7 @@ export const getDashboardData = async (req, res) => {
 
       let resourcesNeeded = [];
       let resourcesAvailable = [];
+      let eventsBenefitted = null;
 
       if (organization.organizationTypeId === 3) {
         // resources needed
@@ -152,6 +139,11 @@ export const getDashboardData = async (req, res) => {
           .select('r.id', 'r.name as name', 'r.unit as unit', 'rn.quantity as quantity')
           .join('resources as r', 'r.id', 'rn.resource_id')
           .where('rn.organization_id', organization.id);
+        eventsBenefitted = await DB('events as e')
+          .count('e.id as count')
+          .leftJoin('event_beneficiaries as eb', 'eb.event_id', 'e.id')
+          .where('eb.organization_id', organization.id)
+          .first();
       } else {
         // resources available
         resourcesAvailable = await DB('resources_available as ra')
@@ -190,6 +182,7 @@ export const getDashboardData = async (req, res) => {
       }
       yourOrganization = {
         totalEvents,
+        eventsBenefitted: eventsBenefitted ? eventsBenefitted.count : 0,
         completedEvents,
         totalPledges,
         successfulEvents,
@@ -217,7 +210,7 @@ export const getDashboardData = async (req, res) => {
     return res.status(200).send(responseObj);
   } catch (err) {
     console.log(err);
-    return res.status(500).send('Something went wrong');
+    return res.status(500).send({ message: 'Something went wrong' });
   }
 };
 
@@ -227,7 +220,7 @@ export const getUnapprovedOrganizations = async (req, res) => {
     return res.status(200).send(organizations);
   } catch (err) {
     console.log(err);
-    return res.status(400).send('Invalid user inputs');
+    return res.status(400).send({ message: 'Invalid user inputs' });
   }
 };
 
@@ -239,7 +232,7 @@ export const getIndividuals = async (req, res) => {
     return res.status(200).send(individuals);
   } catch (err) {
     console.log(err);
-    return res.status(500).send('Something went wrong');
+    return res.status(500).send({ message: 'Something went wrong' });
   }
 };
 
@@ -250,7 +243,48 @@ export const getResources = async (req, res) => {
     return res.status(200).send(resources);
   } catch (err) {
     console.log(err);
-    return res.status(500).send('Something went wrong');
+    return res.status(500).send({ message: 'Something went wrong' });
+  }
+};
+
+export const createResources = async (req, res) => {
+  try {
+    const { name, unit } = req.body;
+    const resourceAvailability = await DB('resources')
+      .select('name', 'id')
+      .where('name', name.toLowerCase())
+      .first();
+    if (resourceAvailability) {
+      return res.status(403).send({ message: 'Item already added' });
+    }
+    await DB('resources')
+      .insert({ unit: unit.value, name });
+    const resources = await DB('resources')
+      .select('name', 'id');
+    return res.status(200).send(resources);
+  } catch (err) {
+    console.log(err);
+    return res.status(500).send({ message: 'Something went wrong' });
+  }
+};
+export const createCategories = async (req, res) => {
+  try {
+    const { name } = req.body;
+    const categoryAvailability = await DB('categories')
+      .select('name', 'id')
+      .where('name', name.toLowerCase())
+      .first();
+    if (categoryAvailability) {
+      return res.status(403).send({ message: 'Category already added' });
+    }
+    await DB('categories')
+      .insert({ name });
+    const categories = await DB('categories')
+      .select('name', 'id');
+    return res.status(200).send(categories);
+  } catch (err) {
+    console.log(err);
+    return res.status(500).send({ message: 'Something went wrong' });
   }
 };
 
@@ -261,7 +295,7 @@ export const getCategories = async (req, res) => {
     return res.status(200).send(categories);
   } catch (err) {
     console.log(err);
-    return res.status(500).send('Something went wrong');
+    return res.status(500).send({ message: 'Something went wrong' });
   }
 };
 
@@ -293,7 +327,7 @@ export const getOrganizationByType = async (req, res) => {
     return res.status(200).send(organizations);
   } catch (err) {
     console.log(err);
-    return res.status(500).send('Something went wrong');
+    return res.status(500).send({ message: 'Something went wrong' });
   }
 };
 
@@ -327,20 +361,38 @@ export const getEvents = async (req, res) => {
     }
 
     const events = await eventQuery;
-    /*
-    Name
-    Main Organizer => Link to organizer
-    Completion Status
-    Followers
-    Pledges Count
-    Rating
-    Active Status => only super admin
-    View
-    */
-    // const responseObj = {};
     return res.status(200).send(events);
   } catch (err) {
     console.log(err);
-    return res.status(500).send('Something went wrong');
+    return res.status(500).send({ message: 'Something went wrong' });
+  }
+};
+
+export const getEventsBenefitted = async (req, res) => {
+  // Currently only main organization has access to this.
+  const tokenData = extractToken(req);
+  const { organization } = tokenData;
+  // console.log({ tokenData });
+  try {
+    const events = await DB('events as e')
+      .leftJoin('organizations as o', 'o.id', 'e.main_organizer_id')
+      .leftJoin('users as u', 'u.id', 'o.user_id')
+      .leftJoin('event_beneficiaries as eb', 'eb.event_id', 'e.id')
+      .where('eb.organization_id', organization.id)
+      .select(
+        'e.id as id',
+        'e.title as title',
+        'e.is_active as isActive',
+        'e.superadmin_deactivation as superadminDeactivation',
+        'e.is_complete as isComplete',
+        'u.name as mainOrganizer',
+        'e.main_organizer_id as mainOrganizerId',
+      )
+      .groupBy('e.id');
+
+    return res.status(200).send(events);
+  } catch (err) {
+    console.log(err);
+    return res.status(500).send({ message: 'Something went wrong' });
   }
 };

@@ -18,14 +18,18 @@ router.post('/auth/register', authController.register);
 router.post('/auth/login', authController.login);
 
 router.post('/autocomplete/resources', autoCompleteController.getResources);
+router.post('/autocomplete/categories', autoCompleteController.getCategories);
 
 router.get('/dashboards', authenticate.all, dashboardController.getDashboardData);
 router.get('/dashboards/approvals', authenticate.superadmin, dashboardController.getUnapprovedOrganizations);
 router.get('/dashboards/organizations/:type', authenticate.superadmin, dashboardController.getOrganizationByType);
 router.get('/dashboards/individuals', authenticate.superadmin, dashboardController.getIndividuals);
 router.get('/dashboards/events', authenticate.moderator, dashboardController.getEvents);
+router.get('/dashboards/events-benefitted', authenticate.moderator, dashboardController.getEventsBenefitted);
 router.get('/dashboards/resources', authenticate.superadmin, dashboardController.getResources);
+router.post('/dashboards/resources', authenticate.superadmin, dashboardController.createResources);
 router.get('/dashboards/categories', authenticate.superadmin, dashboardController.getCategories);
+router.post('/dashboards/categories', authenticate.superadmin, dashboardController.createCategories);
 
 router.post('/events/', eventsController.searchEvents);
 router.post('/events/create', authenticate.organization, eventsController.createEvent);
@@ -46,7 +50,6 @@ router.get('/organizations/profile/:id', organizationsController.getOrganization
 router.put('/organizations/profile/:id/toggle-activation-status', authenticate.superadmin, organizationsController.toggleActivationStatus);
 
 router.get('/profile', authenticate.all, profilesController.getProfile);
-// TODO change to put
 router.post('/profile/edit', authenticate.all, profilesController.editProfile);
 router.get('/profile/sidebar', authenticate.all, profilesController.getSidebar);
 

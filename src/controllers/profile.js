@@ -265,7 +265,7 @@ export const editProfile = async (req, res) => {
     }
 
     trx.commit();
-    return res.status(201).send('successfully updated user');
+    return res.status(201).send({ message: 'successfully updated user' });
   } catch (err) {
     trx.rollback();
     console.log(err);

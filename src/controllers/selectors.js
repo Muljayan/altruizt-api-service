@@ -37,7 +37,7 @@ export const getOrganizations = async (req, res) => {
     return res.status(200).send(organizers);
   } catch (err) {
     console.log(err);
-    return res.status(400).send('Invalid user inputs');
+    return res.status(400).send({ message: 'Invalid user inputs' });
   }
 };
 
@@ -52,7 +52,7 @@ export const getBeneficiaries = async (req, res) => {
     return res.status(200).send(beneficiaries);
   } catch (err) {
     console.log(err);
-    return res.status(400).send('Invalid user inputs');
+    return res.status(400).send({ message: 'Invalid user inputs' });
   }
 };
 
@@ -65,6 +65,6 @@ export const getResources = async (req, res) => {
     return res.status(200).send(resources);
   } catch (err) {
     console.log(err);
-    return res.status(400).send('Invalid user inputs');
+    return res.status(400).send({ message: 'Invalid user inputs' });
   }
 };
