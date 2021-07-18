@@ -842,8 +842,9 @@ export const upvote = async (req, res) => {
   const { id } = req.params;
   const tokenData = extractToken(req);
   const { user } = tokenData;
+  const trx = await DB.transaction();
   try {
-    const ratings = await DB('event_ratings')
+    const ratings = await trx('event_ratings')
       .where('user_id', user.id)
       .where('event_id', id)
       .select('value')
@@ -851,12 +852,12 @@ export const upvote = async (req, res) => {
     if (ratings) {
       // remove
       if (Number(ratings.value) === 1) {
-        await DB('event_ratings')
+        await trx('event_ratings')
           .where('user_id', user.id)
           .where('event_id', id)
           .update({ value: 0 });
       } else {
-        await DB('event_ratings')
+        await trx('event_ratings')
           .where('user_id', user.id)
           .where('event_id', id)
           .update({ value: 1 });
@@ -864,11 +865,20 @@ export const upvote = async (req, res) => {
     } else {
       // add
       const ratingData = { user_id: user.id, event_id: id, value: 1 };
-      await DB('event_ratings')
+      await trx('event_ratings')
         .insert(ratingData);
     }
+    const eventInteractions = await trx('event_interactions')
+      .select('count')
+      .where('event_id', id)
+      .first();
+    await trx('event_interactions')
+      .update({ count: (eventInteractions.count + 1) })
+      .where('event_id', id);
+    trx.commit();
     return res.status(200).send({ message: 'success' });
   } catch (err) {
+    trx.rollback();
     console.log(err);
     return res.status(500).send({ message: 'Something went wrong' });
   }
@@ -878,8 +888,9 @@ export const downvote = async (req, res) => {
   const { id } = req.params;
   const tokenData = extractToken(req);
   const { user } = tokenData;
+  const trx = await DB.transaction();
   try {
-    const ratings = await DB('event_ratings')
+    const ratings = await trx('event_ratings')
       .where('user_id', user.id)
       .where('event_id', id)
       .select('value')
@@ -887,12 +898,12 @@ export const downvote = async (req, res) => {
     if (ratings) {
       // remove
       if (Number(ratings.value) === -1) {
-        await DB('event_ratings')
+        await trx('event_ratings')
           .where('user_id', user.id)
           .where('event_id', id)
           .update({ value: 0 });
       } else {
-        await DB('event_ratings')
+        await trx('event_ratings')
           .where('user_id', user.id)
           .where('event_id', id)
           .update({ value: -1 });
@@ -900,11 +911,11 @@ export const downvote = async (req, res) => {
     } else {
       // add
       const ratingData = { user_id: user.id, event_id: id, value: -1 };
-      await DB('event_ratings')
+      await trx('event_ratings')
         .insert(ratingData);
     }
 
-    const eventRatingScore = await DB('events as e')
+    const eventRatingScore = await trx('events as e')
       .leftJoin('organizations as o', 'o.id', 'e.main_organizer_id')
       .leftJoin('users as u', 'u.id', 'o.user_id')
       .leftJoin('event_ratings as er', 'er.event_id', 'e.id')
@@ -915,7 +926,7 @@ export const downvote = async (req, res) => {
       .first();
     if (Number(eventRatingScore.value) <= FLAG_LIMIT) {
       const message = 'Event deactivated, flagged too many times. Contact the super admin!';
-      await DB('events')
+      await trx('events')
         .update({
           is_active: false,
           superadmin_deactivation: true,
@@ -924,9 +935,17 @@ export const downvote = async (req, res) => {
         .where('id', id);
       await sendEmail(eventRatingScore.email, `Your event #${id} has been flagged`, message);
     }
-
+    const eventInteractions = await trx('event_interactions')
+      .select('count')
+      .where('event_id', id)
+      .first();
+    await trx('event_interactions')
+      .update({ count: (eventInteractions.count + 1) })
+      .where('event_id', id);
+    trx.commit();
     return res.status(200).send({ message: 'success' });
   } catch (err) {
+    trx.rollback();
     console.log(err);
     return res.status(500).send({ message: 'Something went wrong' });
   }
