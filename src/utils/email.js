@@ -20,7 +20,13 @@ const sendEmail = async (email, subject, message) => {
         to: email, // list of receivers
         subject, // Subject line
 
-        html: `<p>${message}</p>`, // html body
+        html: `
+        <p>${message}</p>
+        <br />
+        <p>DISCLAIMER</p>
+        <p>Please note these emails are generated from a prototype application Altruizt which is in partial fulfillment of the requirements of the Degree of Bachelor of Information awarded by the Faculty of Information Technology, University of Moratuwa </p>
+        <p>If you did not sign up for the system your email was probably used by chance by some tester. Do not worry, It is just a testing platform.</p>
+        `, // html body
       });
       console.log('Message sent: %s', info.messageId);
     } catch (err) {
