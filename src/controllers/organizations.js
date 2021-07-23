@@ -176,6 +176,7 @@ export const getOrganizationProfile = async (req, res) => {
         'e.is_complete as isComplete',
       )
       .where('e.is_active', true)
+      .where('e.is_complete', false)
       // .where('e.is_complete', false)
       .groupBy('e.id');
 
@@ -190,8 +191,8 @@ export const getOrganizationProfile = async (req, res) => {
     // Beneficiaries
     if (organization.type === 3) {
       resources = await DB('resources_needed as rn')
+        .leftJoin('resources as r', 'r.id', 'rn.resource_id')
         .select('r.id as id', 'r.name as name', 'r.unit as unit', 'rn.quantity as quantity')
-        .join('resources as r', 'r.id', 'rn.resource_id')
         .where('rn.organization_id', id);
 
       // join beneficiaries and search
