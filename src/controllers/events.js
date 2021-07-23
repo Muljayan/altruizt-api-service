@@ -641,8 +641,10 @@ export const searchEvents = async (req, res) => {
       const cat = await DB('categories_followed')
         .select('category_id as categoryId')
         .where('user_id', tokenData.user.id);
+      console.log({ cat });
       categoriesFollowed = cat.map((category) => category.categoryId);
     }
+    console.log({ categoriesFollowed });
 
     const searchedResources = resources.map((resource) => resource.value);
 
@@ -661,6 +663,7 @@ export const searchEvents = async (req, res) => {
 
     // Gets events based on categories user has followed
     if (categoriesFollowed.length > 0 && personalized) {
+      console.log('personalized');
       eventQuery
         .whereIn('ec.category_id', categoriesFollowed);
     }
