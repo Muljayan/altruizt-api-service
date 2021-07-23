@@ -3,6 +3,7 @@ import { getEventsPreviewData } from '../helpers/events';
 import { getOrganizationActivationStatus } from '../helpers/organizations';
 import sendEmail from '../utils/email';
 import extractToken from '../utils/extractToken';
+import { FLAG_LIMIT } from '../config/settings';
 
 // router.post('/', async (req, res) => {
 export const searchOrganizations = async (req, res) => {
@@ -36,6 +37,65 @@ export const searchOrganizations = async (req, res) => {
     if (searchedResources.length > 0) {
       organizationsQuery
         .whereIn('r.resource_id', searchedResources);
+    }
+
+    const organizations = await organizationsQuery;
+    const responseData = [];
+
+    for await (const organization of organizations) {
+      const categories = await DB('organization_categories as oc')
+        .select('c.id as id', 'c.name as name')
+        .join('categories as c', 'c.id', 'oc.category_id')
+        .where('organization_id', organization.id);
+      let opportunities = [];
+      if (organization.type === 3) {
+        opportunities = await DB('events as e')
+          .leftJoin('event_beneficiaries as eb', 'eb.event_id', 'e.id')
+          .count('e.id as count')
+          .where('eb.organization_id', organization.id)
+          .first();
+      } else {
+        opportunities = await DB('events as e')
+          .leftJoin('event_organizers as eo', 'eo.event_id', 'e.id')
+          .count('e.id as count')
+          .where(function () {
+            this.where('eo.organization_id', organization.id).orWhere('e.main_organizer_id', organization.id);
+          })
+          .first();
+      }
+
+      responseData.push({
+        ...organization,
+        categories,
+        opportunities: opportunities ? opportunities.count : 0,
+      });
+    }
+
+    return res.status(200).send(responseData);
+  } catch (err) {
+    console.log(err);
+    return res.status(500).send({ message: 'Something went wrong' });
+  }
+};
+
+// router.post('/', async (req, res) => {
+export const organizationsFollowed = async (req, res) => {
+  const { searchString } = req.body;
+  const tokenData = extractToken(req);
+  const userId = tokenData.user.id;
+
+  try {
+    const organizationsQuery = DB('organizations as o')
+      .leftJoin('users as u', 'u.id', 'o.user_id')
+      .leftJoin('organization_followers as of', 'of.organization_id', 'o.id')
+      .select('o.id as id', 'u.name as name', 'u.image as image', 'o.organization_type_id as type')
+      .where('o.is_activated', true)
+      .where('of.user_id', userId)
+      .groupBy('o.id');
+
+    if (searchString) {
+      organizationsQuery
+        .where('u.name', 'like', `%${searchString}%`);
     }
 
     const organizations = await organizationsQuery;
@@ -170,12 +230,44 @@ export const getOrganizationProfile = async (req, res) => {
       pastEvents.push(eventData);
     }
 
+    // --------------------
+    let organizationFollowed = false;
+    let upvoted = false;
+    let downvoted = false;
+    if (tokenData) {
+      const follow = await DB('organization_followers')
+        .where('organization_id', id)
+        .where('user_id', tokenData.user.id)
+        .first();
+      if (follow) {
+        organizationFollowed = true;
+      }
+      const ratings = await DB('organization_ratings')
+        .where('organization_id', id)
+        .where('user_id', tokenData.user.id)
+        .select('value')
+        .first();
+      if (ratings) {
+        if (Number(ratings.value) === -1) {
+          downvoted = true;
+        }
+        if (Number(ratings.value) === 1) {
+          upvoted = true;
+        }
+      }
+    }
+    // --------------------
+
     const responseData = {
       // categories
       ...organization,
       resources,
       currentEvents,
       pastEvents,
+      organizationFollowed,
+      downvoted,
+      upvoted,
+      isActive: true,
     };
     return res.status(200).send(responseData);
   } catch (err) {
@@ -255,6 +347,131 @@ export const getEvents = async (req, res) => {
   try {
     const responseObj = {};
     return res.status(500).send(responseObj);
+  } catch (err) {
+    console.log(err);
+    return res.status(500).send({ message: 'Something went wrong' });
+  }
+};
+
+export const upvote = async (req, res) => {
+  const { id } = req.params;
+  const tokenData = extractToken(req);
+  const { user } = tokenData;
+  const trx = await DB.transaction();
+  try {
+    const ratings = await trx('organization_ratings')
+      .where('user_id', user.id)
+      .where('organization_id', id)
+      .select('value')
+      .first();
+
+    if (ratings) {
+      // remove
+      if (Number(ratings.value) === 1) {
+        await trx('organization_ratings')
+          .where('user_id', user.id)
+          .where('organization_id', id)
+          .update({ value: 0 });
+      } else {
+        await trx('organization_ratings')
+          .where('user_id', user.id)
+          .where('organization_id', id)
+          .update({ value: 1 });
+      }
+    } else {
+      // add
+      const ratingData = { user_id: user.id, organization_id: id, value: 1 };
+      await trx('organization_ratings')
+        .insert(ratingData);
+    }
+    trx.commit();
+    return res.status(200).send({ message: 'success' });
+  } catch (err) {
+    trx.rollback();
+    console.log(err);
+    return res.status(500).send({ message: 'Something went wrong' });
+  }
+};
+
+export const downvote = async (req, res) => {
+  const { id } = req.params;
+  const tokenData = extractToken(req);
+  const { user } = tokenData;
+  const trx = await DB.transaction();
+  try {
+    const ratings = await trx('organization_ratings')
+      .where('user_id', user.id)
+      .where('organization_id', id)
+      .select('value')
+      .first();
+    if (ratings) {
+      // remove
+      if (Number(ratings.value) === -1) {
+        await trx('organization_ratings')
+          .where('user_id', user.id)
+          .where('organization_id', id)
+          .update({ value: 0 });
+      } else {
+        await trx('organization_ratings')
+          .where('user_id', user.id)
+          .where('organization_id', id)
+          .update({ value: -1 });
+      }
+    } else {
+      // add
+      const ratingData = { user_id: user.id, organization_id: id, value: -1 };
+      await trx('organization_ratings')
+        .insert(ratingData);
+    }
+
+    const OrganizationRating = await trx('organization_ratings as or')
+      .leftJoin('organizations as o', 'o.id', 'or.organization_id')
+      .leftJoin('users as u', 'u.id', 'o.user_id')
+      .sum('or.value as value')
+      .select('o.id as id', 'u.email as email')
+      .where('o.id', id)
+      .first();
+
+    if (Number(OrganizationRating.value) <= FLAG_LIMIT) {
+      const message = 'Organization deactivated, flagged too many times. Contact the super admin!';
+      await trx('events')
+        .update({
+          is_activated: false,
+        })
+        .where('id', id);
+      await sendEmail(OrganizationRating.email, `Your event #${id} has been flagged`, message);
+    }
+    trx.commit();
+    return res.status(200).send({ message: 'success' });
+  } catch (err) {
+    trx.rollback();
+    console.log(err);
+    return res.status(500).send({ message: 'Something went wrong' });
+  }
+};
+
+export const toggleEventFollow = async (req, res) => {
+  const { id } = req.params;
+  const tokenData = extractToken(req);
+  const { user } = tokenData;
+  try {
+    const followers = await DB('organization_followers')
+      .where('user_id', user.id)
+      .where('organization_id', id)
+      .first();
+    if (followers) {
+      // remove
+      await DB('organization_followers')
+        .where('user_id', user.id)
+        .where('organization_id', id)
+        .delete();
+    } else {
+      // add
+      const followerData = { user_id: user.id, organization_id: id };
+      await DB('organization_followers')
+        .insert(followerData);
+    }
+    return res.status(200).send({ message: 'success' });
   } catch (err) {
     console.log(err);
     return res.status(500).send({ message: 'Something went wrong' });

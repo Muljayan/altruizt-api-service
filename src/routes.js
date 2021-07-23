@@ -46,8 +46,12 @@ router.put('/events/profile/:id/downvote', authenticate.all, eventsController.do
 router.put('/events/profile/:id/toggle-activation-status', authenticate.moderator, eventsController.toggleActivationStatus);
 
 router.post('/organizations', organizationsController.searchOrganizations);
+router.post('/organizations/followed', organizationsController.organizationsFollowed);
 router.get('/organizations/profile/:id', organizationsController.getOrganizationProfile);
 router.put('/organizations/profile/:id/toggle-activation-status', authenticate.superadmin, organizationsController.toggleActivationStatus);
+router.put('/organizations/profile/:id/follow', authenticate.all, organizationsController.toggleEventFollow);
+router.put('/organizations/profile/:id/upvote', authenticate.all, organizationsController.upvote);
+router.put('/organizations/profile/:id/downvote', authenticate.all, organizationsController.downvote);
 
 router.get('/profile', authenticate.all, profilesController.getProfile);
 router.post('/profile/edit', authenticate.all, profilesController.editProfile);

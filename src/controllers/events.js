@@ -838,6 +838,7 @@ export const toggleEventFollow = async (req, res) => {
     return res.status(500).send({ message: 'Something went wrong' });
   }
 };
+
 export const upvote = async (req, res) => {
   const { id } = req.params;
   const tokenData = extractToken(req);
