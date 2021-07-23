@@ -57,8 +57,8 @@ export const getProfile = async (req, res) => {
     }
 
     categoriesFollowed = await DB('categories_followed as cf')
+      .leftJoin('categories as c', 'c.id', 'cf.category_id')
       .select('c.name as label', 'c.id as value')
-      .join('categories as c', 'c.id', 'cf.category_id')
       .where('cf.user_id', u.id);
 
     let userType = { value: 'individual', label: 'Individual' };
@@ -159,12 +159,11 @@ export const editProfile = async (req, res) => {
     await trx('users')
       .update(userData)
       .where('id', u.id);
-
+    await trx('categories_followed')
+      .where('user_id', u.id)
+      .delete();
     // categoriesFollowede
     if (categoriesFollowed && categoriesFollowed.length > 0) {
-      await trx('categories_followed')
-        .where('user_id', u.id)
-        .delete();
       for await (const categoryFollowed of categoriesFollowed) {
         await trx('categories_followed')
           .insert({ user_id: u.id, category_id: categoryFollowed.value });
