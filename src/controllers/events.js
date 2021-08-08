@@ -641,10 +641,8 @@ export const searchEvents = async (req, res) => {
       const cat = await DB('categories_followed')
         .select('category_id as categoryId')
         .where('user_id', tokenData.user.id);
-      console.log({ cat });
       categoriesFollowed = cat.map((category) => category.categoryId);
     }
-    console.log({ categoriesFollowed });
 
     const searchedResources = resources.map((resource) => resource.value);
 
@@ -657,13 +655,12 @@ export const searchEvents = async (req, res) => {
       .leftJoin('event_categories as ec', 'ec.event_id', 'e.id')
       .leftJoin('event_interactions as ei', 'ei.event_id', 'e.id')
       .where('e.is_active', true)
-      // .where('e.is_complete', false)
       .groupBy('e.id')
       .orderBy('interactions', 'asc');
+      // .where('e.is_complete', false)
 
     // Gets events based on categories user has followed
     if (categoriesFollowed.length > 0 && personalized) {
-      console.log('personalized');
       eventQuery
         .whereIn('ec.category_id', categoriesFollowed);
     }

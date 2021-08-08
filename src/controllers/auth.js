@@ -41,7 +41,6 @@ export const register = async (req, res) => {
       return res.status(400).send({ message: 'Name, password and/or email is missing!' });
     }
 
-    // It is compulsory for organizations to include the address and phone number
     if (isAnOrganization) {
       if (!address || !phone) {
         trx.rollback();
