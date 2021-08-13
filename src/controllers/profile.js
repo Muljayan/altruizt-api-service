@@ -275,13 +275,22 @@ export const editProfile = async (req, res) => {
 // router.get('/sidebar', );
 export const getSidebar = async (req, res) => {
   const tokenData = extractToken(req);
-  const { user } = tokenData;
+  let user = null;
+  if (tokenData) {
+    user = tokenData.user;
+  }
   try {
-    const categories = await DB('categories as c')
+    const categoryQuery = DB('categories as c')
       .join('categories_followed as cf', 'cf.category_id', 'c.id')
       .select('c.id', 'c.name')
-      .where('cf.user_id', user.id)
+      // .where('cf.user_id', user.id)
       .groupBy('c.id');
+
+    if (user && user.id) {
+      categoryQuery
+        .where('cf.user_id', user.id);
+    }
+    const categories = await categoryQuery;
 
     const suggestions = [];
 

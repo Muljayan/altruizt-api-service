@@ -55,7 +55,7 @@ router.put('/organizations/profile/:id/downvote', authenticate.all, organization
 
 router.get('/profile', authenticate.all, profilesController.getProfile);
 router.post('/profile/edit', authenticate.all, profilesController.editProfile);
-router.get('/profile/sidebar', authenticate.all, profilesController.getSidebar);
+router.get('/profile/sidebar', profilesController.getSidebar);
 
 router.get('/selectors/categories', selectorsProfile.getCategories);
 router.get('/selectors/organization-types', selectorsProfile.getOrganizationTypes);
