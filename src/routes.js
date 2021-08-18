@@ -16,6 +16,8 @@ router.get('/', (req, res) => res.status(200).send({ works: true }));
 
 router.post('/auth/register', authController.register);
 router.post('/auth/login', authController.login);
+router.post('/auth/reset-token', authController.getResetToken);
+router.post('/auth/reset-password', authController.resetPassword);
 
 router.post('/autocomplete/resources', autoCompleteController.getResources);
 router.post('/autocomplete/categories', autoCompleteController.getCategories);

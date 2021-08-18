@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
+import { v4 as uuid } from 'uuid';
 
 import DB from '../config/database';
 import { JWT_SECRET } from '../config/secrets';
@@ -153,6 +154,109 @@ export const register = async (req, res) => {
 
     trx.commit();
     return res.status(201).send({ message: 'successfully added user' });
+  } catch (err) {
+    trx.rollback();
+    console.log(err);
+    return res.status(400).send({ message: 'invalid user inputs' });
+  }
+};
+
+/**
+ * @route POST /auth/reset-token
+ * @description Get password reset token
+ * @access   Public
+ */
+export const getResetToken = async (req, res) => {
+  // Create transaction object
+  const trx = await DB.transaction();
+  try {
+    const {
+      email,
+    } = req.body;
+
+    // Generate a slug for url
+    const existingUser = await trx('users')
+      .where('email', email)
+      .first();
+
+    if (!existingUser) {
+      trx.rollback();
+      return res.status(400).send({ message: 'User does not exists!' });
+    }
+
+    const salt = bcrypt.genSaltSync(10);
+    const hashedToken = bcrypt.hashSync(uuid(), salt);
+    console.log({ hashedToken, email, id: existingUser.id });
+    const userData = {
+      reset_token: hashedToken,
+    };
+    await trx('users')
+      .update(userData)
+      .where('id', existingUser.id);
+
+    const emailMessage = `Your reset token is ${hashedToken}`;
+
+    await sendEmail(email, 'Altruizt Password Reset Token', emailMessage);
+
+    trx.commit();
+    return res.status(201).send({ message: 'Password reset token sent' });
+  } catch (err) {
+    trx.rollback();
+    console.log(err);
+    return res.status(400).send({ message: 'invalid user inputs' });
+  }
+};
+
+/**
+ * @route POST /auth/reset-password
+ * @description Reset Password
+ * @access   Public
+ */
+export const resetPassword = async (req, res) => {
+  // Create transaction object
+  const trx = await DB.transaction();
+  try {
+    const {
+      email,
+      password,
+      resetToken,
+    } = req.body;
+
+    // Generate a slug for url
+    const existingUser = await trx('users')
+      .where('email', email)
+      .first();
+
+    if (!existingUser) {
+      trx.rollback();
+      return res.status(400).send({ message: 'User does not exists!' });
+    }
+
+    if (existingUser && !existingUser.reset_token) {
+      trx.rollback();
+      return res.status(400).send({ message: 'Warning! You cannot change the password' });
+    }
+    if (existingUser && (existingUser.reset_token !== resetToken)) {
+      trx.rollback();
+      return res.status(400).send({ message: 'Warning! Invalid reset token, please check your email' });
+    }
+
+    const salt = bcrypt.genSaltSync(10);
+    const hashedPassword = bcrypt.hashSync(password, salt);
+    const userData = {
+      reset_token: null,
+      password: hashedPassword,
+    };
+    await trx('users')
+      .update(userData)
+      .where('email', email);
+
+    const message = 'Your password has been reset!';
+
+    await sendEmail(email, 'Altruizt Password Reset', message);
+
+    trx.commit();
+    return res.status(201).send({ message });
   } catch (err) {
     trx.rollback();
     console.log(err);
